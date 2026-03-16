@@ -21,7 +21,7 @@ COPY --from=builder /install /usr/local
 
 # Copy application code
 COPY app/ ./app/
-COPY schema.sql .
+COPY schema.sql seed.py ./
 
 # Own everything by app user
 RUN chown -R app:app /app
