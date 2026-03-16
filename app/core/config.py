@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "SalesLeap"
     DEBUG: bool = False
     SECRET_KEY: str = "change-me-in-production"
+    PORT: int = 8000
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://user:pass@localhost:5432/salesleap"
