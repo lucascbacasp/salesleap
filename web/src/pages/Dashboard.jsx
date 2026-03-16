@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 
@@ -50,6 +51,12 @@ export default function Dashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            to="/coach"
+            className="text-sm bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-lg transition"
+          >
+            🧠 AI Coach
+          </Link>
           <span className="text-gray-400 text-sm hidden md:block">{user.email}</span>
           <button
             onClick={logout}
@@ -130,6 +137,21 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Coach CTA */}
+      <Link
+        to="/coach"
+        className="block bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 rounded-xl p-5 hover:border-primary/60 transition mb-8"
+      >
+        <div className="flex items-center gap-4">
+          <div className="text-3xl">🧠</div>
+          <div>
+            <h3 className="font-semibold text-white">AI Sales Coach</h3>
+            <p className="text-sm text-gray-400">Preguntale lo que quieras sobre ventas, practicá roleplays o pedí tips personalizados</p>
+          </div>
+          <span className="text-gray-400 ml-auto">→</span>
+        </div>
+      </Link>
     </div>
   );
 }
@@ -154,18 +176,21 @@ function PathCard({ path }) {
   const color = levelColors[path.level] || 'text-gray-400 bg-gray-400/10';
 
   return (
-    <div className="bg-surface rounded-xl p-5 border border-gray-800 hover:border-primary/50 transition">
+    <Link
+      to={`/path/${path.id}`}
+      className="bg-surface rounded-xl p-5 border border-gray-800 hover:border-primary/50 transition block"
+    >
       <div className="flex items-start justify-between mb-2">
         <h4 className="font-semibold text-white">{path.title}</h4>
         <span className={`text-xs px-2 py-0.5 rounded-full ${color}`}>
           {levelLabels[path.level] || path.level}
         </span>
       </div>
-      <p className="text-sm text-gray-400 mb-3">{path.description}</p>
+      <p className="text-sm text-gray-400 mb-3 line-clamp-2">{path.description}</p>
       <div className="flex items-center gap-3 text-xs text-gray-500">
         <span>⭐ {path.xp_reward} XP</span>
         <span>📖 {path.industry}</span>
       </div>
-    </div>
+    </Link>
   );
 }

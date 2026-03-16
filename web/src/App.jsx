@@ -3,6 +3,9 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
+import PathDetail from './pages/PathDetail';
+import LessonView from './pages/LessonView';
+import Coach from './pages/Coach';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -49,6 +52,30 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/path/:pathId"
+        element={
+          <ProtectedRoute>
+            <PathDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/lesson/:lessonId"
+        element={
+          <ProtectedRoute>
+            <LessonView />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/coach"
+        element={
+          <ProtectedRoute>
+            <Coach />
           </ProtectedRoute>
         }
       />
