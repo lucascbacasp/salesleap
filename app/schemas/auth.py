@@ -1,0 +1,24 @@
+from typing import Optional
+
+from pydantic import BaseModel, EmailStr
+
+
+class MagicLinkRequest(BaseModel):
+    email: EmailStr
+    full_name: Optional[str] = None
+
+
+class MagicLinkResponse(BaseModel):
+    message: str
+
+
+class VerifyTokenRequest(BaseModel):
+    token: str
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: str
+    is_new_user: bool
+    onboarding_done: bool
