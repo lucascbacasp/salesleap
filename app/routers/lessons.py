@@ -54,7 +54,7 @@ async def complete_lesson(lesson_id: UUID, body: CompleteLessonRequest, db: DB, 
     progress.status = ProgressStatus.completed
     progress.score = body.score
     progress.time_spent_sec = body.time_spent_sec
-    progress.attempts += 1
+    progress.attempts = (progress.attempts or 0) + 1
     progress.completed_at = datetime.now(timezone.utc)
 
     # Dar XP
