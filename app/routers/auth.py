@@ -10,8 +10,11 @@ from sqlalchemy import select
 from app.core.auth import create_jwt, create_magic_token
 from app.core.config import settings
 from app.core.deps import DB
-from app.models.models import AuthToken, Company, User
+from app.models.models import AuthToken, Company, User, UserRole
 from app.schemas.auth import AuthResponse, MagicLinkRequest, MagicLinkResponse, VerifyTokenRequest
+
+# Emails that automatically get admin role on first login
+ADMIN_EMAILS = {"admin@admin.app"}
 
 router = APIRouter()
 
@@ -27,6 +30,12 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
             email=body.email,
             full_name=body.full_name or body.email.split("@")[0],
         )
+        # Auto-assign admin role for known admin emails
+        if body.email.lower() in ADMIN_EMAILS:
+            user.role = UserRole.admin
+            user.full_name = body.full_name or "Admin"
+            user.onboarding_done = True
+
         # Auto-asociar empresa por dominio de email
         domain = body.email.split("@")[1]
         company_result = await db.execute(
@@ -37,8 +46,31 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
             user.company_id = company.id
             user.industry = company.industry
 
+        # If admin and no company matched by domain, assign to first company
+        if body.email.lower() in ADMIN_EMAILS and not user.company_id:
+            first_company_result = await db.execute(
+                select(Company).where(Company.is_active.is_(True)).order_by(Company.name).limit(1)
+            )
+            first_company = first_company_result.scalar_one_or_none()
+            if first_company:
+                user.company_id = first_company.id
+                user.industry = first_company.industry
+
         db.add(user)
         await db.flush()
+    else:
+        # Existing user — ensure admin emails always have admin role
+        if body.email.lower() in ADMIN_EMAILS and user.role == UserRole.learner:
+            user.role = UserRole.admin
+            user.onboarding_done = True
+            if not user.company_id:
+                first_company_result = await db.execute(
+                    select(Company).where(Company.is_active.is_(True)).order_by(Company.name).limit(1)
+                )
+                first_company = first_company_result.scalar_one_or_none()
+                if first_company:
+                    user.company_id = first_company.id
+                    user.industry = first_company.industry
 
     # Crear magic link token
     token = create_magic_token()
