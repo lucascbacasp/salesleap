@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import PathDetail from './pages/PathDetail';
 import LessonView from './pages/LessonView';
 import Coach from './pages/Coach';
+import Admin from './pages/Admin';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -76,6 +77,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Coach />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <Admin />
           </ProtectedRoute>
         }
       />

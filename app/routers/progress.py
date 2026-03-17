@@ -1,15 +1,16 @@
 """
-GET /api/progress/me              → progreso del usuario actual
-GET /api/progress/mission         → misión diaria (3 lecciones/día)
-GET /api/progress/company/{id}    → progreso de la empresa
+GET /api/progress/me                        → progreso del usuario actual
+GET /api/progress/mission                   → misión diaria (3 lecciones/día)
+GET /api/progress/company/{id}              → progreso de la empresa
+GET /api/progress/company/{id}/weekly       → métricas semanales del equipo
 """
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter
-from sqlalchemy import func, select
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import and_, func, select
 
-from app.core.deps import DB, CurrentUser
+from app.core.deps import DB, CurrentUser, ManagerUser
 from app.models.models import (
     DailyStreak, LearningPath, Module, Lesson, OnboardingResult,
     User, UserLessonProgress, UserPathProgress, ProgressStatus,
@@ -179,4 +180,94 @@ async def get_company_progress(company_id: UUID, db: DB, user: CurrentUser):
         "company_id": str(company_id),
         "total_users": len(users),
         "stats": sorted(stats, key=lambda x: x["total_xp"], reverse=True),
+    }
+
+
+WEEKLY_LESSON_TARGET = 3
+
+
+@router.get("/company/{company_id}/weekly")
+async def get_company_weekly(company_id: UUID, db: DB, user: ManagerUser):
+    """Weekly team metrics for the admin panel. Requires manager role."""
+
+    # Verify user belongs to this company
+    if user.company_id != company_id and user.role.value != "superadmin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tenés acceso a esta empresa")
+
+    # Get all active users in the company
+    users_result = await db.execute(
+        select(User).where(User.company_id == company_id, User.is_active.is_(True))
+    )
+    users = users_result.scalars().all()
+
+    if not users:
+        return {
+            "company_id": str(company_id),
+            "total_users": 0,
+            "active_this_week": 0,
+            "completed_target": 0,
+            "completed_target_pct": 0,
+            "team": [],
+        }
+
+    # Week boundaries (Monday to Sunday)
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    sunday = monday + timedelta(days=6)
+
+    team = []
+    active_count = 0
+    completed_target_count = 0
+
+    for u in users:
+        # Lessons completed this week
+        week_result = await db.execute(
+            select(func.count()).where(
+                UserLessonProgress.user_id == u.id,
+                UserLessonProgress.status == ProgressStatus.completed,
+                UserLessonProgress.completed_at >= datetime(monday.year, monday.month, monday.day, tzinfo=timezone.utc),
+                UserLessonProgress.completed_at < datetime(sunday.year, sunday.month, sunday.day, tzinfo=timezone.utc) + timedelta(days=1),
+            )
+        )
+        lessons_this_week = week_result.scalar() or 0
+
+        # Total lessons completed (all time)
+        total_result = await db.execute(
+            select(func.count()).where(
+                UserLessonProgress.user_id == u.id,
+                UserLessonProgress.status == ProgressStatus.completed,
+            )
+        )
+        total_lessons = total_result.scalar() or 0
+
+        if lessons_this_week > 0:
+            active_count += 1
+        if lessons_this_week >= WEEKLY_LESSON_TARGET:
+            completed_target_count += 1
+
+        team.append({
+            "user_id": str(u.id),
+            "full_name": u.full_name,
+            "email": u.email,
+            "lessons_this_week": lessons_this_week,
+            "total_lessons": total_lessons,
+            "streak_current": u.streak_current,
+            "total_xp": u.total_xp,
+            "level": u.level,
+            "last_activity": u.last_activity_at.isoformat() if u.last_activity_at else None,
+            "met_weekly_target": lessons_this_week >= WEEKLY_LESSON_TARGET,
+        })
+
+    total_users = len(users)
+
+    return {
+        "company_id": str(company_id),
+        "week_start": monday.isoformat(),
+        "week_end": sunday.isoformat(),
+        "total_users": total_users,
+        "active_this_week": active_count,
+        "completed_target": completed_target_count,
+        "completed_target_pct": round((completed_target_count / total_users * 100) if total_users > 0 else 0),
+        "weekly_target": WEEKLY_LESSON_TARGET,
+        "team": sorted(team, key=lambda x: x["lessons_this_week"], reverse=True),
     }

@@ -48,4 +48,5 @@ export const api = {
   // Progress
   getProgress: () => request('/progress/me'),
   getMission: () => request('/progress/mission'),
+  getCompanyWeekly: (companyId) => request(`/progress/company/${companyId}/weekly`),
 };

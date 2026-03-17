@@ -54,6 +54,14 @@ export default function Dashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-3">
+          {['manager', 'admin', 'superadmin'].includes(user.role) && (
+            <Link
+              to="/admin"
+              className="text-sm bg-accent/10 text-accent hover:bg-accent/20 px-3 py-1.5 rounded-lg transition"
+            >
+              📊 Admin
+            </Link>
+          )}
           <Link
             to="/coach"
             className="text-sm bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-lg transition"

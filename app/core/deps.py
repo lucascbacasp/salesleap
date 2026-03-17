@@ -33,3 +33,13 @@ async def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def require_manager(user: CurrentUser) -> User:
+    """Require the user to be a manager or admin."""
+    if user.role.value not in ("manager", "admin", "superadmin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere rol de manager")
+    return user
+
+
+ManagerUser = Annotated[User, Depends(require_manager)]
