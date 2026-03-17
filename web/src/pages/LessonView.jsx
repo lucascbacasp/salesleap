@@ -11,6 +11,7 @@ export default function LessonView() {
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [result, setResult] = useState(null);
+  const [feedbackDismissed, setFeedbackDismissed] = useState(false);
   const startTime = useRef(Date.now());
 
   useEffect(() => {
@@ -72,8 +73,15 @@ export default function LessonView() {
         <RoleplayLesson lesson={lesson} onComplete={handleComplete} completing={completing} />
       )}
 
+      {/* AI Feedback overlay (shown before completion modal for roleplays) */}
+      {result && result.ai_feedback && !feedbackDismissed && (
+        <FeedbackOverlay feedback={result.ai_feedback} onContinue={() => setFeedbackDismissed(true)} />
+      )}
+
       {/* Completion result overlay */}
-      {result && <CompletionModal result={result} onClose={() => navigate(-1)} />}
+      {result && (!result.ai_feedback || feedbackDismissed) && (
+        <CompletionModal result={result} onClose={() => navigate(-1)} />
+      )}
     </div>
   );
 
@@ -266,31 +274,12 @@ function QuizLesson({ lesson, onComplete, completing }) {
 // =============================================
 function RoleplayLesson({ lesson, onComplete, completing }) {
   const [response, setResponse] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const [feedback, setFeedback] = useState('');
-  const [evaluating, setEvaluating] = useState(false);
   const content = lesson.content;
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!response.trim()) return;
-    setSubmitted(true);
-    setEvaluating(true);
-
-    try {
-      // Use the AI coach evaluate endpoint for feedback
-      const evalResult = await api.completeLesson(lesson.id, {
-        score: null,
-        time_spent_sec: 0,
-        answers: [{ question: content.scenario, answer: response }],
-      });
-      setFeedback(evalResult.ai_feedback || 'Respuesta registrada. ¡Buen trabajo!');
-      onComplete(75, [{ question: content.scenario, answer: response }]);
-    } catch {
-      setFeedback('Respuesta registrada.');
-      onComplete(75, [{ question: content.scenario, answer: response }]);
-    } finally {
-      setEvaluating(false);
-    }
+    // Send the response to the backend — AI evaluation happens server-side
+    onComplete(null, [{ question: content.scenario, answer: response }]);
   };
 
   return (
@@ -324,39 +313,63 @@ function RoleplayLesson({ lesson, onComplete, completing }) {
       )}
 
       {/* Response area */}
-      {!submitted ? (
-        <div>
-          <textarea
-            value={response}
-            onChange={(e) => setResponse(e.target.value)}
-            placeholder="Escribí tu respuesta como si estuvieras hablando con el cliente..."
-            rows={6}
-            className="w-full bg-surface border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primary transition resize-none mb-4"
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={!response.trim() || completing}
-            className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
-          >
-            {completing ? 'Enviando...' : '🚀 Enviar respuesta'}
-          </button>
+      <textarea
+        value={response}
+        onChange={(e) => setResponse(e.target.value)}
+        placeholder="Escribí tu respuesta como si estuvieras hablando con el cliente..."
+        rows={6}
+        className="w-full bg-surface border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primary transition resize-none mb-4"
+        disabled={completing}
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={!response.trim() || completing}
+        className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
+      >
+        {completing ? '🧠 Evaluando con IA...' : '🚀 Enviar respuesta'}
+      </button>
+    </div>
+  );
+}
+
+// =============================================
+// AI FEEDBACK OVERLAY (shown before completion modal)
+// =============================================
+function FeedbackOverlay({ feedback, onContinue }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => { setTimeout(() => setShow(true), 50); }, []);
+
+  // Split feedback into main + tip
+  const parts = feedback.split('\n\n💡 Tip: ');
+  const mainFeedback = parts[0];
+  const tip = parts[1] || null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className={`bg-surface rounded-2xl p-8 max-w-md w-full transition-all duration-500 ${show ? 'scale-100 opacity-100' : 'scale-90 opacity-0'}`}>
+        <div className="text-center mb-4">
+          <div className="text-4xl mb-2">🧠</div>
+          <h2 className="text-xl font-bold">Feedback del AI Coach</h2>
         </div>
-      ) : (
-        <div className="bg-surface rounded-2xl p-6">
-          <h3 className="text-sm font-semibold text-green-400 mb-2">Tu respuesta:</h3>
-          <p className="text-gray-300 text-sm mb-4 italic">"{response}"</p>
-          {evaluating ? (
-            <div className="flex items-center gap-2 text-gray-400">
-              <span className="animate-spin">🧠</span> Evaluando con IA...
-            </div>
-          ) : feedback ? (
-            <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
-              <span className="text-xs text-primary block mb-1">💬 Feedback del AI Coach</span>
-              <p className="text-sm text-gray-300">{feedback}</p>
-            </div>
-          ) : null}
+
+        <div className="bg-surface-light rounded-xl p-5 mb-4">
+          <p className="text-gray-300 leading-relaxed">{mainFeedback}</p>
         </div>
-      )}
+
+        {tip && (
+          <div className="bg-accent/10 border border-accent/30 rounded-xl p-4 mb-4">
+            <span className="text-xs text-accent font-semibold block mb-1">💡 Tip para aplicar hoy</span>
+            <p className="text-sm text-gray-300">{tip}</p>
+          </div>
+        )}
+
+        <button
+          onClick={onContinue}
+          className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition"
+        >
+          Ver mis puntos →
+        </button>
+      </div>
     </div>
   );
 }

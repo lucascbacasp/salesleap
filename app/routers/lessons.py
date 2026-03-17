@@ -2,6 +2,7 @@
 GET  /api/lessons/{id}          → detalle de una lección
 POST /api/lessons/{id}/complete → completar lección + XP + gamification
 """
+import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -9,9 +10,11 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from app.core.deps import DB, CurrentUser
-from app.models.models import Lesson, UserLessonProgress, ProgressStatus
+from app.models.models import Lesson, LessonType, UserLessonProgress, ProgressStatus
 from app.schemas.lessons import CompleteLessonRequest, CompleteLessonResponse, LessonOut
 from app.services.gamification import award_xp, check_badges, update_streak
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -56,6 +59,43 @@ async def complete_lesson(lesson_id: UUID, body: CompleteLessonRequest, db: DB, 
     progress.time_spent_sec = body.time_spent_sec
     progress.attempts = (progress.attempts or 0) + 1
     progress.completed_at = datetime.now(timezone.utc)
+
+    # Roleplay: evaluate with AI Coach
+    ai_feedback = None
+    if lesson.lesson_type == LessonType.roleplay and body.answers:
+        try:
+            from app.services.ai_coach import evaluate_quiz_answer
+
+            answer_data = body.answers[0]
+            scenario = answer_data.get("question", "")
+            user_response = answer_data.get("answer", "")
+
+            # Build ideal response hint from lesson content
+            content = lesson.content or {}
+            objective = content.get("objective", "Responder de forma profesional y persuasiva")
+            criteria = content.get("evaluation_criteria", [])
+            ideal_hint = f"Objetivo: {objective}. Criterios de evaluación: {', '.join(criteria)}" if criteria else objective
+
+            eval_result = await evaluate_quiz_answer(
+                question=scenario,
+                user_answer=user_response,
+                correct_answer=ideal_hint,
+                industry=user.industry or "ventas",
+                user_level=user.experience_level or "beginner",
+            )
+
+            ai_feedback = eval_result.get("feedback", "")
+            tip = eval_result.get("tip", "")
+            if tip:
+                ai_feedback = f"{ai_feedback}\n\n💡 Tip: {tip}"
+
+            ai_score = eval_result.get("score", 75)
+            progress.score = ai_score
+            progress.ai_feedback = ai_feedback
+
+        except Exception as e:
+            logger.warning(f"AI evaluation failed for roleplay: {e}")
+            progress.ai_feedback = None
 
     # Dar XP
     xp = lesson.xp_reward
