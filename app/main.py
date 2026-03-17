@@ -70,16 +70,15 @@ async def admin_init_db(x_admin_key: str = Header(...)):
     # Run schema.sql
     try:
         schema_sql = schema_path.read_text()
-        # Split by statements and execute (asyncpg can't handle multiple statements at once)
         async with engine.begin() as conn:
-            # Use raw_connection for multi-statement SQL
-            raw = await conn.get_raw_connection()
-            await raw.execute(schema_sql)
+            # Get the underlying asyncpg connection which supports multi-statement execute
+            raw_conn = await conn.get_raw_connection()
+            await raw_conn.driver_connection.execute(schema_sql)
         results.append("schema.sql executed successfully")
     except Exception as e:
         error_msg = str(e)
         if "already exists" in error_msg:
-            results.append(f"schema.sql: tables already exist (OK)")
+            results.append("schema.sql: tables already exist (OK)")
         else:
             results.append(f"schema.sql error: {error_msg}")
 
