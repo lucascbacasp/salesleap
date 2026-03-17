@@ -68,23 +68,15 @@ async def _seed_data(db: AsyncSession):
 
 
 async def _register_and_login(client: AsyncClient) -> str:
-    """Register a user, grab the token from DB, verify it, return JWT."""
-    await client.post(
+    """Register a user via demo mode (returns JWT directly)."""
+    resp = await client.post(
         "/api/auth/request-link",
         json={"email": "journey@test.com", "full_name": "Journey User"},
     )
-    # Grab token directly from DB
-    conn = await asyncpg.connect(RAW_DSN)
-    try:
-        row = await conn.fetchrow(
-            "SELECT token FROM auth_tokens ORDER BY created_at DESC LIMIT 1"
-        )
-    finally:
-        await conn.close()
-
-    resp = await client.post("/api/auth/verify", json={"token": row["token"]})
     assert resp.status_code == 200
-    return resp.json()["access_token"]
+    data = resp.json()
+    assert "access_token" in data
+    return data["access_token"]
 
 
 async def test_full_user_journey(client: AsyncClient, db: AsyncSession):

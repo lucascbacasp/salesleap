@@ -10,6 +10,10 @@ class MagicLinkRequest(BaseModel):
 
 class MagicLinkResponse(BaseModel):
     message: str
+    access_token: Optional[str] = None
+    user_id: Optional[str] = None
+    is_new_user: Optional[bool] = None
+    onboarding_done: Optional[bool] = None
 
 
 class VerifyTokenRequest(BaseModel):

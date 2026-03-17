@@ -11,9 +11,10 @@ export default function Login() {
 }
 
 function RequestLink() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,29 +23,17 @@ function RequestLink() {
     setError('');
     setLoading(true);
     try {
-      await api.requestLink(email, name);
-      setSent(true);
+      const data = await api.requestLink(email, name);
+      if (data.access_token) {
+        login(data.access_token);
+        navigate(data.onboarding_done ? '/dashboard' : '/onboarding', { replace: true });
+      }
     } catch (err) {
-      setError(err.detail || 'Error al enviar el link');
+      setError(err.detail || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
   };
-
-  if (sent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-surface rounded-2xl p-8 max-w-md w-full text-center">
-          <div className="text-5xl mb-4">📧</div>
-          <h2 className="text-2xl font-bold mb-2">Revisá tu email</h2>
-          <p className="text-gray-400">
-            Te enviamos un magic link a <span className="text-primary font-medium">{email}</span>.
-            Hacé click en el link para ingresar.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -87,7 +76,7 @@ function RequestLink() {
             disabled={loading}
             className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
           >
-            {loading ? 'Enviando...' : 'Enviar magic link'}
+            {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
         </form>
       </div>

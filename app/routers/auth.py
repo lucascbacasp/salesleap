@@ -51,9 +51,22 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
     db.add(auth_token)
     await db.commit()
 
-    # TODO: enviar email con el magic link vía app.services.email
-    # Por ahora loggeamos el token para desarrollo
-    return MagicLinkResponse(message="Magic link enviado. Revisá tu email.")
+    # En modo demo: auto-verificar y devolver JWT directo
+    # En producción con email configurado, enviar el magic link por email
+    auth_token.used_at = datetime.now(timezone.utc)
+    user.email_verified = True
+    is_new = not user.onboarding_done
+    await db.commit()
+
+    jwt_token = create_jwt(user.id)
+
+    return MagicLinkResponse(
+        message="Sesión iniciada.",
+        access_token=jwt_token,
+        user_id=str(user.id),
+        is_new_user=is_new,
+        onboarding_done=user.onboarding_done,
+    )
 
 
 @router.post("/verify", response_model=AuthResponse)
