@@ -8,19 +8,22 @@ export default function Dashboard() {
   const [badges, setBadges] = useState([]);
   const [paths, setPaths] = useState([]);
   const [progress, setProgress] = useState(null);
+  const [mission, setMission] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [b, p, pr] = await Promise.all([
+        const [b, p, pr, m] = await Promise.all([
           api.getBadges(),
           api.getPaths(user?.industry),
           api.getProgress(),
+          api.getMission(),
         ]);
         setBadges(b);
         setPaths(p);
         setProgress(pr);
+        setMission(m);
       } catch {
         // ignore for now
       } finally {
@@ -78,6 +81,11 @@ export default function Dashboard() {
             : 'Completá una lección hoy para arrancar tu racha'}
         </p>
       </div>
+
+      {/* Daily Mission Card */}
+      {mission && (
+        <MissionCard mission={mission} />
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
@@ -152,6 +160,86 @@ export default function Dashboard() {
           <span className="text-gray-400 ml-auto">→</span>
         </div>
       </Link>
+    </div>
+  );
+}
+
+function MissionCard({ mission }) {
+  const { target, completed_today, is_completed, assigned_path, next_lesson } = mission;
+  const pct = Math.round((completed_today / target) * 100);
+
+  return (
+    <div className={`rounded-xl p-5 mb-8 border ${
+      is_completed
+        ? 'bg-green-500/10 border-green-500/30'
+        : 'bg-gradient-to-r from-primary/10 to-accent/10 border-primary/30'
+    }`}>
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl">{is_completed ? '✅' : '🏆'}</span>
+            <h3 className="font-semibold text-white">
+              {is_completed ? '¡Misión completada!' : 'Misión de hoy'}
+            </h3>
+          </div>
+          <p className="text-sm text-gray-400">
+            {is_completed
+              ? '¡Excelente trabajo! Volvé mañana por una nueva misión.'
+              : `Completá ${target} lecciones hoy para mantener tu racha`
+            }
+          </p>
+        </div>
+      </div>
+
+      {/* Progress dots */}
+      <div className="flex items-center gap-2 mb-3">
+        {Array.from({ length: target }).map((_, i) => (
+          <div
+            key={i}
+            className={`flex-1 h-2.5 rounded-full transition-all duration-500 ${
+              i < completed_today
+                ? is_completed ? 'bg-green-500' : 'bg-primary'
+                : 'bg-gray-700'
+            }`}
+          />
+        ))}
+        <span className={`text-sm font-medium ml-1 ${
+          is_completed ? 'text-green-400' : 'text-gray-400'
+        }`}>
+          {completed_today}/{target}
+        </span>
+      </div>
+
+      {/* Assigned path info */}
+      {assigned_path && (
+        <div className="bg-surface/50 rounded-lg p-3 flex items-center justify-between">
+          <div>
+            <span className="text-xs text-gray-500">Tu ruta</span>
+            <div className="text-sm font-medium text-white">{assigned_path.title}</div>
+            <div className="text-xs text-gray-400">
+              {assigned_path.completed_lessons}/{assigned_path.total_lessons} lecciones · {assigned_path.progress_pct}%
+            </div>
+          </div>
+
+          {!is_completed && next_lesson && (
+            <Link
+              to={`/lesson/${next_lesson.id}`}
+              className="bg-primary hover:bg-primary-dark text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center gap-1"
+            >
+              Siguiente →
+            </Link>
+          )}
+
+          {!next_lesson && assigned_path && (
+            <Link
+              to={`/path/${assigned_path.id}`}
+              className="bg-surface-light text-gray-300 text-sm px-4 py-2 rounded-lg hover:text-white transition"
+            >
+              Ver ruta
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -154,6 +154,8 @@ export default function Onboarding() {
   // Results
   if (result) {
     const levelLabels = { beginner: 'Principiante', intermediate: 'Intermedio', advanced: 'Avanzado' };
+    const ap = result.assigned_path;
+
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="bg-surface rounded-2xl p-8 max-w-lg w-full">
@@ -184,18 +186,49 @@ export default function Onboarding() {
             </div>
           </div>
 
-          <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 mb-6">
+          <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 mb-4">
             <span className="text-xs text-accent block mb-1">💡 Quick Win</span>
             <span className="text-sm text-gray-300">{result.quick_win_tip}</span>
           </div>
 
+          {/* Assigned Path + Mission */}
+          {ap && (
+            <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/30 rounded-xl p-5 mb-6">
+              <div className="text-center mb-3">
+                <span className="text-xs text-gray-400 uppercase tracking-wide">Tu ruta asignada</span>
+                <h3 className="text-lg font-bold text-white mt-1">{ap.title}</h3>
+                <p className="text-sm text-gray-400 mt-1">{ap.description}</p>
+              </div>
+
+              <div className="flex items-center justify-center gap-4 text-sm text-gray-400 mb-4">
+                <span>📦 {ap.total_modules} módulos</span>
+                <span>📚 {ap.total_lessons} lecciones</span>
+                <span>⭐ {ap.xp_reward} XP</span>
+              </div>
+
+              <div className="bg-surface rounded-lg p-4 text-center">
+                <div className="text-2xl mb-2">🏆</div>
+                <h4 className="font-semibold text-white mb-1">Tu misión de hoy</h4>
+                <p className="text-sm text-gray-300">
+                  Completá <span className="text-accent font-bold">3 lecciones</span> y ganá tu primer badge
+                </p>
+                <div className="flex justify-center gap-1 mt-3">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="w-10 h-2 rounded-full bg-gray-700" />
+                  ))}
+                </div>
+                <span className="text-xs text-gray-500 mt-1 block">0 / 3 lecciones</span>
+              </div>
+            </div>
+          )}
+
           {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(ap ? `/path/${ap.id}` : '/dashboard')}
             className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition"
           >
-            Ir al dashboard
+            {ap ? 'Empezar mi primera lección' : 'Ir al dashboard'}
           </button>
         </div>
       </div>

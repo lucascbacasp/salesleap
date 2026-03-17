@@ -47,4 +47,5 @@ export const api = {
 
   // Progress
   getProgress: () => request('/progress/me'),
+  getMission: () => request('/progress/mission'),
 };

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -15,6 +15,18 @@ class OnboardingQuizRequest(BaseModel):
     answers: List[OnboardingAnswer]
 
 
+class AssignedPathOut(BaseModel):
+    id: UUID
+    title: str
+    description: Optional[str] = None
+    level: str
+    xp_reward: int
+    total_modules: int = 0
+    total_lessons: int = 0
+
+    model_config = {"from_attributes": True}
+
+
 class OnboardingQuizResponse(BaseModel):
     level: str
     strengths: List[str]
@@ -23,3 +35,4 @@ class OnboardingQuizResponse(BaseModel):
     explanation: str
     quick_win_tip: str
     suggested_path_ids: List[UUID]
+    assigned_path: Optional[AssignedPathOut] = None
