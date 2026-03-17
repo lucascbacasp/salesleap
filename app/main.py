@@ -122,6 +122,230 @@ async def admin_init_db(x_admin_key: str = Header(...)):
     return {"results": results}
 
 
+@app.post("/api/admin/seed-demo")
+async def admin_seed_demo(x_admin_key: str = Header(...)):
+    """Create demo company + salespeople with fake progress for admin panel demo."""
+    if x_admin_key != settings.SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    import uuid
+    import random
+    from datetime import datetime, date, timedelta, timezone
+    from app.models.models import (
+        Company, User, UserRole, UserLessonProgress, UserPathProgress,
+        DailyStreak, Lesson, Module, ProgressStatus,
+    )
+    from sqlalchemy import select, func
+
+    results = []
+
+    async with async_session() as db:
+        # ── 1. Create or get company "SalesLeap Demo" with domain admin.app ──
+        company_result = await db.execute(
+            select(Company).where(Company.email_domain == "admin.app")
+        )
+        company = company_result.scalar_one_or_none()
+
+        if not company:
+            company = Company(
+                id=uuid.UUID("a0000000-0000-0000-0000-000000000099"),
+                name="SalesLeap Demo",
+                slug="salesleap-demo",
+                email_domain="admin.app",
+                industry="auto",
+                plan="pro",
+                is_active=True,
+                settings={},
+            )
+            db.add(company)
+            await db.flush()
+            results.append("Company 'SalesLeap Demo' created")
+        else:
+            results.append("Company 'SalesLeap Demo' already exists")
+
+        # ── 2. Create or update the 3 salespeople + admin ──
+        DEMO_USERS = [
+            {"email": "lucas@admin.app", "full_name": "Lucas García", "role": UserRole.learner},
+            {"email": "andres@admin.app", "full_name": "Andrés Martínez", "role": UserRole.learner},
+            {"email": "kun@admin.app", "full_name": "Sergio Agüero", "role": UserRole.learner},
+            {"email": "admin@admin.app", "full_name": "Admin", "role": UserRole.admin},
+        ]
+
+        users_created = []
+        for u_data in DEMO_USERS:
+            u_result = await db.execute(select(User).where(User.email == u_data["email"]))
+            user = u_result.scalar_one_or_none()
+            if not user:
+                user = User(
+                    email=u_data["email"],
+                    full_name=u_data["full_name"],
+                    role=u_data["role"],
+                    company_id=company.id,
+                    industry="auto",
+                    experience_level="beginner",
+                    email_verified=True,
+                    onboarding_done=True,
+                    is_active=True,
+                )
+                db.add(user)
+                await db.flush()
+                results.append(f"User '{u_data['full_name']}' created")
+            else:
+                # Update existing user to belong to this company
+                user.company_id = company.id
+                user.industry = "auto"
+                user.onboarding_done = True
+                if u_data["role"] == UserRole.admin:
+                    user.role = UserRole.admin
+                results.append(f"User '{u_data['full_name']}' updated")
+
+            users_created.append(user)
+
+        await db.flush()
+
+        # ── 3. Get all published lessons from the auto path ──
+        auto_path_id = uuid.UUID("b0000000-0000-0000-0000-000000000001")
+        lessons_result = await db.execute(
+            select(Lesson)
+            .join(Module, Lesson.module_id == Module.id)
+            .where(Module.path_id == auto_path_id, Lesson.is_published.is_(True))
+            .order_by(Module.order_index, Lesson.order_index)
+        )
+        all_lessons = lessons_result.scalars().all()
+
+        if not all_lessons:
+            results.append("ERROR: No lessons found — run init-db first")
+            return {"results": results}
+
+        results.append(f"Found {len(all_lessons)} lessons in auto path")
+
+        # ── 4. Generate progress for each salesperson (not admin) ──
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())  # this week's Monday
+
+        # Different profiles for variety:
+        # Lucas: star performer — 8 lessons done, 5 this week, 4-day streak
+        # Andrés: moderate — 5 lessons done, 2 this week, 1-day streak
+        # Kun: slacker — 2 lessons done, 0 this week, 0 streak
+        PROFILES = [
+            {
+                "user_idx": 0,  # Lucas
+                "lessons_total": 8,
+                "lessons_this_week": 5,
+                "streak": 4,
+                "xp_base": 40,
+            },
+            {
+                "user_idx": 1,  # Andrés
+                "lessons_total": 5,
+                "lessons_this_week": 2,
+                "streak": 1,
+                "xp_base": 35,
+            },
+            {
+                "user_idx": 2,  # Kun
+                "lessons_total": 2,
+                "lessons_this_week": 0,
+                "streak": 0,
+                "xp_base": 30,
+            },
+        ]
+
+        for profile in PROFILES:
+            user = users_created[profile["user_idx"]]
+            total_lessons = min(profile["lessons_total"], len(all_lessons))
+            this_week = profile["lessons_this_week"]
+
+            # Clear existing progress for this user
+            await db.execute(
+                text("DELETE FROM user_lesson_progress WHERE user_id = :uid"),
+                {"uid": user.id},
+            )
+            await db.execute(
+                text("DELETE FROM user_path_progress WHERE user_id = :uid"),
+                {"uid": user.id},
+            )
+            await db.execute(
+                text("DELETE FROM daily_streaks WHERE user_id = :uid"),
+                {"uid": user.id},
+            )
+
+            total_xp = 0
+            # Create completed lessons — older ones first, then this week's
+            older_count = total_lessons - this_week
+            for i in range(total_lessons):
+                lesson = all_lessons[i]
+                xp = random.randint(profile["xp_base"] - 10, profile["xp_base"] + 15)
+                total_xp += xp
+
+                if i < older_count:
+                    # Completed last week or earlier
+                    days_ago = random.randint(7, 14)
+                    completed_at = datetime.now(timezone.utc) - timedelta(days=days_ago, hours=random.randint(1, 12))
+                else:
+                    # Completed this week
+                    day_offset = random.randint(0, min((today - monday).days, 6))
+                    completed_at = datetime(
+                        monday.year, monday.month, monday.day,
+                        random.randint(8, 20), random.randint(0, 59),
+                        tzinfo=timezone.utc,
+                    ) + timedelta(days=day_offset)
+
+                progress = UserLessonProgress(
+                    user_id=user.id,
+                    lesson_id=lesson.id,
+                    status=ProgressStatus.completed,
+                    score=random.randint(70, 100),
+                    attempts=random.randint(1, 3),
+                    time_spent_sec=random.randint(120, 600),
+                    completed_at=completed_at,
+                )
+                db.add(progress)
+
+            # Create path progress
+            path_progress = UserPathProgress(
+                user_id=user.id,
+                path_id=auto_path_id,
+                status=ProgressStatus.in_progress if total_lessons < len(all_lessons) else ProgressStatus.completed,
+                started_at=datetime.now(timezone.utc) - timedelta(days=14),
+                xp_earned=total_xp,
+            )
+            db.add(path_progress)
+
+            # Create daily streaks for this week
+            for day_offset in range(min(this_week, (today - monday).days + 1)):
+                streak_date = monday + timedelta(days=day_offset)
+                daily_xp = random.randint(30, 50)
+                streak = DailyStreak(
+                    user_id=user.id,
+                    activity_date=streak_date,
+                    xp_earned=daily_xp,
+                    lessons_done=random.randint(1, 3),
+                )
+                db.add(streak)
+
+            # Update user stats
+            user.total_xp = total_xp
+            user.level = max(1, total_xp // 500 + 1)
+            user.streak_current = profile["streak"]
+            user.streak_max = max(profile["streak"], 5)
+            user.last_activity_at = (
+                datetime.now(timezone.utc) - timedelta(hours=random.randint(1, 4))
+                if profile["streak"] > 0
+                else datetime.now(timezone.utc) - timedelta(days=random.randint(3, 7))
+            )
+
+            results.append(
+                f"{user.full_name}: {total_lessons} lessons, {this_week} this week, "
+                f"streak={profile['streak']}, xp={total_xp}, level={user.level}"
+            )
+
+        await db.commit()
+        results.append("Demo data seeded successfully!")
+
+    return {"results": results}
+
+
 # ── Serve React SPA (must be AFTER all API routes) ──────────
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
