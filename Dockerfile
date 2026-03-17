@@ -15,6 +15,7 @@ WORKDIR /web
 
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
+RUN npm rebuild lightningcss
 
 COPY web/ ./
 RUN npm run build
