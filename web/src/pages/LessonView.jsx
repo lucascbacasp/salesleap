@@ -10,6 +10,7 @@ export default function LessonView() {
   const [lesson, setLesson] = useState(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
+  const [alreadyCompleted, setAlreadyCompleted] = useState(false);
   const [result, setResult] = useState(null);
   const [feedbackDismissed, setFeedbackDismissed] = useState(false);
   const startTime = useRef(Date.now());
@@ -19,6 +20,7 @@ export default function LessonView() {
       try {
         const data = await api.getLesson(lessonId);
         setLesson(data);
+        if (data.user_completed) setAlreadyCompleted(true);
       } catch {
         // error
       } finally {
@@ -60,17 +62,46 @@ export default function LessonView() {
         </span>
       </div>
 
-      <h1 className="text-2xl font-bold text-white mb-6">{lesson.title}</h1>
+      <h1 className="text-2xl font-bold text-white mb-4">{lesson.title}</h1>
+
+      {/* Already-completed banner */}
+      {alreadyCompleted && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <span className="text-2xl">✅</span>
+          <div>
+            <p className="font-semibold text-green-400">Ya completaste esta lección</p>
+            <p className="text-sm text-gray-400">Tu progreso fue registrado. Podés repasar el contenido.</p>
+          </div>
+        </div>
+      )}
 
       {/* Render based on type */}
       {lesson.lesson_type === 'theory' && (
-        <TheoryLesson lesson={lesson} onComplete={handleComplete} completing={completing} />
+        <TheoryLesson
+          lesson={lesson}
+          onComplete={handleComplete}
+          completing={completing}
+          alreadyCompleted={alreadyCompleted}
+          onBack={() => navigate(-1)}
+        />
       )}
       {(lesson.lesson_type === 'quiz' || lesson.lesson_type === 'challenge') && (
-        <QuizLesson lesson={lesson} onComplete={handleComplete} completing={completing} />
+        <QuizLesson
+          lesson={lesson}
+          onComplete={handleComplete}
+          completing={completing}
+          alreadyCompleted={alreadyCompleted}
+          onBack={() => navigate(-1)}
+        />
       )}
       {lesson.lesson_type === 'roleplay' && (
-        <RoleplayLesson lesson={lesson} onComplete={handleComplete} completing={completing} />
+        <RoleplayLesson
+          lesson={lesson}
+          onComplete={handleComplete}
+          completing={completing}
+          alreadyCompleted={alreadyCompleted}
+          onBack={() => navigate(-1)}
+        />
       )}
 
       {/* AI Feedback overlay (shown before completion modal for roleplays) */}
@@ -80,12 +111,16 @@ export default function LessonView() {
 
       {/* Completion result overlay */}
       {result && (!result.ai_feedback || feedbackDismissed) && (
-        <CompletionModal result={result} onClose={() => navigate(-1)} />
+        <CompletionModal result={result} onClose={() => navigate('/dashboard')} />
       )}
     </div>
   );
 
   async function handleComplete(score = null, answers = null) {
+    if (alreadyCompleted) {
+      navigate('/dashboard');
+      return;
+    }
     setCompleting(true);
     try {
       const timeSpent = Math.floor((Date.now() - startTime.current) / 1000);
@@ -97,7 +132,12 @@ export default function LessonView() {
       setResult(data);
       await refreshUser();
     } catch (err) {
-      console.error('Error completing lesson:', err);
+      if (err.status === 400) {
+        // Lesson was already completed (e.g. seeded data) — treat as done
+        setAlreadyCompleted(true);
+      } else {
+        console.error('Error completing lesson:', err);
+      }
     } finally {
       setCompleting(false);
     }
@@ -107,7 +147,7 @@ export default function LessonView() {
 // =============================================
 // THEORY LESSON
 // =============================================
-function TheoryLesson({ lesson, onComplete, completing }) {
+function TheoryLesson({ lesson, onComplete, completing, alreadyCompleted, onBack }) {
   const content = lesson.content;
   return (
     <div>
@@ -140,13 +180,22 @@ function TheoryLesson({ lesson, onComplete, completing }) {
         </div>
       )}
 
-      <button
-        onClick={() => onComplete(100)}
-        disabled={completing}
-        className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
-      >
-        {completing ? 'Completando...' : '✅ Marcar como completada'}
-      </button>
+      {alreadyCompleted ? (
+        <button
+          onClick={onBack}
+          className="w-full bg-surface-light hover:bg-surface text-gray-300 font-semibold py-3 rounded-lg transition border border-gray-700"
+        >
+          ← Volver
+        </button>
+      ) : (
+        <button
+          onClick={() => onComplete(100)}
+          disabled={completing}
+          className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
+        >
+          {completing ? 'Completando...' : '✅ Marcar como completada'}
+        </button>
+      )}
     </div>
   );
 }
@@ -154,16 +203,37 @@ function TheoryLesson({ lesson, onComplete, completing }) {
 // =============================================
 // QUIZ / CHALLENGE LESSON
 // =============================================
-function QuizLesson({ lesson, onComplete, completing }) {
+function QuizLesson({ lesson, onComplete, completing, alreadyCompleted, onBack }) {
   const questions = lesson.content.questions || [];
   const [current, setCurrent] = useState(0);
   const [selected, setSelected] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [answers, setAnswers] = useState([]);
   const [score, setScore] = useState(0);
-  const [finished, setFinished] = useState(false);
 
   const q = questions[current];
+
+  // If already completed, show locked state
+  if (alreadyCompleted) {
+    return (
+      <div>
+        {lesson.content.text && (
+          <p className="text-gray-400 mb-6">{lesson.content.text}</p>
+        )}
+        <div className="bg-surface rounded-2xl p-8 text-center text-gray-400 mb-4">
+          <div className="text-3xl mb-2">✅</div>
+          <p className="font-medium text-white">Quiz ya completado</p>
+          <p className="text-sm mt-1">{questions.length} pregunta{questions.length !== 1 ? 's' : ''} respondidas.</p>
+        </div>
+        <button
+          onClick={onBack}
+          className="w-full bg-surface-light hover:bg-surface text-gray-300 font-semibold py-3 rounded-lg transition border border-gray-700"
+        >
+          ← Volver
+        </button>
+      </div>
+    );
+  }
 
   const handleSelect = (idx) => {
     if (showFeedback) return;
@@ -185,9 +255,6 @@ function QuizLesson({ lesson, onComplete, completing }) {
       setSelected(null);
       setShowFeedback(false);
     } else {
-      setFinished(true);
-      const finalScore = ((score + (selected === q?.correct ? 0 : 0)) / questions.length) * 100;
-      // Score is already accumulated, just pass it
       const totalCorrect = answers.filter((a) => a.is_correct).length;
       onComplete(Math.round((totalCorrect / questions.length) * 100), answers);
     }
@@ -272,13 +339,12 @@ function QuizLesson({ lesson, onComplete, completing }) {
 // =============================================
 // ROLEPLAY LESSON
 // =============================================
-function RoleplayLesson({ lesson, onComplete, completing }) {
+function RoleplayLesson({ lesson, onComplete, completing, alreadyCompleted, onBack }) {
   const [response, setResponse] = useState('');
   const content = lesson.content;
 
   const handleSubmit = () => {
     if (!response.trim()) return;
-    // Send the response to the backend — AI evaluation happens server-side
     onComplete(null, [{ question: content.scenario, answer: response }]);
   };
 
@@ -316,18 +382,28 @@ function RoleplayLesson({ lesson, onComplete, completing }) {
       <textarea
         value={response}
         onChange={(e) => setResponse(e.target.value)}
-        placeholder="Escribí tu respuesta como si estuvieras hablando con el cliente..."
+        placeholder={alreadyCompleted ? 'Ya enviaste tu respuesta.' : 'Escribí tu respuesta como si estuvieras hablando con el cliente...'}
         rows={6}
         className="w-full bg-surface border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primary transition resize-none mb-4"
-        disabled={completing}
+        disabled={completing || alreadyCompleted}
       />
-      <button
-        onClick={handleSubmit}
-        disabled={!response.trim() || completing}
-        className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
-      >
-        {completing ? '🧠 Evaluando con IA...' : '🚀 Enviar respuesta'}
-      </button>
+
+      {alreadyCompleted ? (
+        <button
+          onClick={onBack}
+          className="w-full bg-surface-light hover:bg-surface text-gray-300 font-semibold py-3 rounded-lg transition border border-gray-700"
+        >
+          ← Volver
+        </button>
+      ) : (
+        <button
+          onClick={handleSubmit}
+          disabled={!response.trim() || completing}
+          className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
+        >
+          {completing ? '🧠 Evaluando con IA...' : '🚀 Enviar respuesta'}
+        </button>
+      )}
     </div>
   );
 }
@@ -435,7 +511,7 @@ function CompletionModal({ result, onClose }) {
           onClick={onClose}
           className="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 rounded-lg transition"
         >
-          Continuar
+          Continuar al dashboard →
         </button>
       </div>
     </div>

@@ -9,27 +9,15 @@ export default function PathDetail() {
   const navigate = useNavigate();
   const [path, setPath] = useState(null);
   const [modules, setModules] = useState([]);
-  const [progress, setProgress] = useState(null);
-  const [missionData, setMissionData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedModule, setExpandedModule] = useState(null);
 
   useEffect(() => {
     async function load() {
       try {
-        // Fetch paths + mission progress in parallel
-        const [paths, mission] = await Promise.all([
-          api.getPaths(),
-          api.getMission(),
-        ]);
+        const paths = await api.getPaths();
         const p = paths.find((x) => x.id === pathId);
         setPath(p);
-        setMissionData(mission);
-
-        if (p) {
-          const prog = await api.getProgress();
-          setProgress(prog);
-        }
       } catch (err) {
         console.error('Error loading path:', err);
       } finally {
@@ -90,11 +78,10 @@ export default function PathDetail() {
 
   const totalLessons = modules.reduce((acc, m) => acc + (m.lessons?.length || 0), 0);
   const totalMinutes = modules.reduce((acc, m) => acc + (m.estimated_minutes || 0), 0);
-
-  // Progress bar: use mission data if the assigned path matches this path
-  const assignedPath = missionData?.assigned_path;
-  const progressPct = assignedPath?.id === pathId ? (assignedPath?.progress_pct ?? 0) : 0;
-  const completedLessonsCount = assignedPath?.id === pathId ? (assignedPath?.completed_lessons ?? 0) : 0;
+  const completedLessonsCount = modules.reduce(
+    (acc, m) => acc + (m.lessons?.filter((l) => l.completed)?.length || 0), 0
+  );
+  const progressPct = totalLessons > 0 ? Math.round((completedLessonsCount / totalLessons) * 100) : 0;
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-3xl mx-auto">
@@ -185,11 +172,15 @@ export default function PathDetail() {
                         to={`/lesson/${lesson.id}`}
                         className="flex items-center gap-3 px-4 py-3 hover:bg-surface-light/50 transition border-t border-gray-800/50"
                       >
-                        <div className="w-6 h-6 rounded-full bg-gray-800 flex items-center justify-center text-xs">
-                          {typeIcons[lesson.lesson_type] || '📄'}
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+                          lesson.completed ? 'bg-green-500/20 text-green-400' : 'bg-gray-800'
+                        }`}>
+                          {lesson.completed ? '✓' : typeIcons[lesson.lesson_type] || '📄'}
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm text-white">{lesson.title}</p>
+                          <p className={`text-sm ${lesson.completed ? 'text-gray-400' : 'text-white'}`}>
+                            {lesson.title}
+                          </p>
                           <p className="text-xs text-gray-500">
                             {typeLabels[lesson.lesson_type]} · {lesson.estimated_minutes} min · {lesson.xp_reward} XP
                           </p>

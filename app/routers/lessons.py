@@ -27,7 +27,28 @@ async def get_lesson(lesson_id: UUID, db: DB, user: CurrentUser):
     lesson = result.scalar_one_or_none()
     if lesson is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Leccion no encontrada")
-    return lesson
+
+    # Check if user has already completed this lesson
+    progress_result = await db.execute(
+        select(UserLessonProgress).where(
+            UserLessonProgress.user_id == user.id,
+            UserLessonProgress.lesson_id == lesson_id,
+            UserLessonProgress.status == ProgressStatus.completed,
+        )
+    )
+    user_completed = progress_result.scalar_one_or_none() is not None
+
+    return {
+        "id": lesson.id,
+        "module_id": lesson.module_id,
+        "title": lesson.title,
+        "lesson_type": lesson.lesson_type.value,
+        "content": lesson.content,
+        "order_index": lesson.order_index,
+        "xp_reward": lesson.xp_reward,
+        "estimated_minutes": lesson.estimated_minutes,
+        "user_completed": user_completed,
+    }
 
 
 @router.post("/{lesson_id}/complete", response_model=CompleteLessonResponse)

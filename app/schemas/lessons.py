@@ -14,6 +14,7 @@ class LessonOut(BaseModel):
     order_index: int
     xp_reward: int
     estimated_minutes: int
+    user_completed: bool = False
 
     model_config = {"from_attributes": True}
 

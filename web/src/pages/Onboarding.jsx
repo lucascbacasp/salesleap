@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -42,8 +42,15 @@ const INDUSTRIES = [
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [step, setStep] = useState(0); // 0=industry, 1-3=questions, 4=results
+
+  // Redirect if already done onboarding
+  useEffect(() => {
+    if (user?.onboarding_done) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
   const [industry, setIndustry] = useState('');
   const [experience, setExperience] = useState(1);
   const [answers, setAnswers] = useState([]);

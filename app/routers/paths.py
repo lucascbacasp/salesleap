@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import DB, CurrentUser
-from app.models.models import LearningPath, Module
+from app.models.models import LearningPath, Module, UserLessonProgress, ProgressStatus
 from app.schemas.paths import PathOut
 
 router = APIRouter()
@@ -57,6 +57,15 @@ async def get_path_modules(path_id: UUID, db: DB, user: CurrentUser):
     )
     modules = result.scalars().all()
 
+    # Get completed lesson IDs for this user in one query
+    completed_result = await db.execute(
+        select(UserLessonProgress.lesson_id).where(
+            UserLessonProgress.user_id == user.id,
+            UserLessonProgress.status == ProgressStatus.completed,
+        )
+    )
+    completed_ids = set(completed_result.scalars().all())
+
     return [
         {
             "id": m.id,
@@ -74,8 +83,10 @@ async def get_path_modules(path_id: UUID, db: DB, user: CurrentUser):
                     "order_index": l.order_index,
                     "xp_reward": l.xp_reward,
                     "estimated_minutes": l.estimated_minutes,
+                    "completed": l.id in completed_ids,
                 }
                 for l in sorted(m.lessons, key=lambda x: x.order_index)
+                if l.is_published
             ],
         }
         for m in modules
