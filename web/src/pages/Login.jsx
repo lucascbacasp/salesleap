@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -90,7 +90,7 @@ function VerifyToken({ token }) {
   const [error, setError] = useState('');
   const [verifying, setVerifying] = useState(true);
 
-  useState(() => {
+  useEffect(() => {
     (async () => {
       try {
         const data = await api.verify(token);
@@ -106,7 +106,8 @@ function VerifyToken({ token }) {
         setVerifying(false);
       }
     })();
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   if (error) {
     return (

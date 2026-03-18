@@ -10,25 +10,23 @@ export default function PathDetail() {
   const [path, setPath] = useState(null);
   const [modules, setModules] = useState([]);
   const [progress, setProgress] = useState(null);
+  const [missionData, setMissionData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedModule, setExpandedModule] = useState(null);
 
   useEffect(() => {
     async function load() {
       try {
-        // Get all paths and find this one
-        const paths = await api.getPaths();
+        // Fetch paths + mission progress in parallel
+        const [paths, mission] = await Promise.all([
+          api.getPaths(),
+          api.getMission(),
+        ]);
         const p = paths.find((x) => x.id === pathId);
         setPath(p);
+        setMissionData(mission);
 
-        // Load each module's details (with lessons)
         if (p) {
-          // We need to get modules — use paths endpoint or fetch individually
-          // For MVP, fetch modules by getting path detail from modules endpoint
-          const modPromises = [];
-          // Try fetching modules — the backend returns modules with lessons via /modules/{id}
-          // But we don't have a list endpoint, so we'll use a workaround
-          // Let's load progress to know completion status
           const prog = await api.getProgress();
           setProgress(prog);
         }
@@ -93,6 +91,11 @@ export default function PathDetail() {
   const totalLessons = modules.reduce((acc, m) => acc + (m.lessons?.length || 0), 0);
   const totalMinutes = modules.reduce((acc, m) => acc + (m.estimated_minutes || 0), 0);
 
+  // Progress bar: use mission data if the assigned path matches this path
+  const assignedPath = missionData?.assigned_path;
+  const progressPct = assignedPath?.id === pathId ? (assignedPath?.progress_pct ?? 0) : 0;
+  const completedLessonsCount = assignedPath?.id === pathId ? (assignedPath?.completed_lessons ?? 0) : 0;
+
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-3xl mx-auto">
       {/* Header */}
@@ -126,12 +129,12 @@ export default function PathDetail() {
         <div className="mt-4">
           <div className="flex justify-between text-xs text-gray-500 mb-1">
             <span>Progreso general</span>
-            <span>0%</span>
+            <span>{completedLessonsCount}/{totalLessons} lecciones · {progressPct}%</span>
           </div>
           <div className="h-2.5 bg-surface-light rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-700"
-              style={{ width: '0%' }}
+              style={{ width: `${progressPct}%` }}
             />
           </div>
         </div>
