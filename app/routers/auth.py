@@ -93,6 +93,34 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
                     user.company_id = first_company.id
                     user.industry = first_company.industry
 
+        # Existing non-admin user with onboarding not done → recover from pre-seeded state
+        if not user.onboarding_done and body.email.lower() not in ADMIN_EMAILS:
+            path_check = await db.execute(
+                select(UserPathProgress).where(UserPathProgress.user_id == user.id).limit(1)
+            )
+            if path_check.scalar_one_or_none():
+                # Path already assigned (e.g. by seed) — just mark onboarding done
+                user.onboarding_done = True
+            elif user.company_id:
+                # Check if company has an onboarding path and assign it
+                onb_path_result = await db.execute(
+                    select(LearningPath).where(
+                        LearningPath.company_id == user.company_id,
+                        LearningPath.industry == "onboarding",
+                        LearningPath.is_published.is_(True),
+                    ).limit(1)
+                )
+                onb_path = onb_path_result.scalar_one_or_none()
+                if onb_path:
+                    db.add(UserPathProgress(
+                        user_id=user.id,
+                        path_id=onb_path.id,
+                        status=ProgressStatus.in_progress,
+                        started_at=datetime.now(timezone.utc),
+                    ))
+                    user.onboarding_done = True
+                    await db.flush()
+
     # Crear magic link token
     token = create_magic_token()
     auth_token = AuthToken(

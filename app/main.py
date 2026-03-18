@@ -426,18 +426,36 @@ async def admin_seed_industria(x_admin_key: str = Header(...)):
                     )
                     db.add(user)
                     await db.flush()
-                    if not u_data["onboarding_done"]:
+                    results.append(f"User '{u_data['full_name']}' ({u_data['email']}) created")
+                else:
+                    # BUG 2 fix: update company_id for existing users
+                    user.company_id = INDUSTRIA_COMPANY["id"]
+                    user.industry = "manufactura"
+                    user.email_verified = True
+                    results.append(f"User '{u_data['full_name']}' updated (company assigned)")
+
+                # BUG 3+4 fix: ensure onboarding path is assigned for learners
+                # (for both new and existing users)
+                if u_data["role"] == "learner":
+                    path_check = await db.execute(
+                        select(UserPathProgress).where(
+                            UserPathProgress.user_id == user.id,
+                            UserPathProgress.path_id == ONBOARDING_PATH["id"],
+                        )
+                    )
+                    if not path_check.scalar_one_or_none():
                         db.add(UserPathProgress(
                             user_id=user.id,
                             path_id=ONBOARDING_PATH["id"],
                             status=ProgressStatus.in_progress,
                             started_at=datetime.now(timezone.utc),
                         ))
-                    results.append(f"User '{u_data['full_name']}' ({u_data['email']}) created")
-                else:
-                    results.append(f"User '{u_data['full_name']}' already exists")
+                        results.append(f"  → Onboarding path assigned to {u_data['email']}")
+                    else:
+                        results.append(f"  → Onboarding path already assigned to {u_data['email']}")
 
             # ── 5. Insert new onboarding badges (idempotent) ──
+            # BUG 1 fix: use CAST(:criteria AS jsonb) instead of :criteria::jsonb
             NEW_BADGES = [
                 ("Orientado",    "Completaste el mapa del área en tu primer día",    "🗺️", "onboarding", '{"onboarding_lesson": "El mapa del área"}',              75,  "common"),
                 ("En acción",    "Completaste tu primer ticket real",                 "⚙️", "onboarding", '{"onboarding_lesson": "Primer ticket real"}',            100, "rare"),
@@ -453,7 +471,7 @@ async def admin_seed_industria(x_admin_key: str = Header(...)):
                     await db.execute(
                         text("""
                             INSERT INTO badges (name, description, icon, category, criteria, xp_bonus, rarity)
-                            VALUES (:name, :desc, :icon, :cat, :criteria::jsonb, :xp, :rarity)
+                            VALUES (:name, :desc, :icon, :cat, CAST(:criteria AS jsonb), :xp, :rarity)
                         """),
                         {"name": name, "desc": desc, "icon": icon, "cat": cat,
                          "criteria": criteria_json, "xp": xp_bonus, "rarity": rarity}
