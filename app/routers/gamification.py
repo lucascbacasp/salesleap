@@ -46,22 +46,30 @@ async def get_leaderboard(
 
 @router.get("/badges", response_model=List[BadgeOut])
 async def get_my_badges(db: DB, user: CurrentUser):
-    result = await db.execute(
+    """Returns ALL badges in the system, with earned=True/False for the current user."""
+    # Get all system badges
+    all_badges_result = await db.execute(select(Badge).order_by(Badge.category, Badge.name))
+    all_badges = all_badges_result.scalars().all()
+
+    # Get badges already earned by the user
+    earned_result = await db.execute(
         select(UserBadge)
         .where(UserBadge.user_id == user.id)
         .options(selectinload(UserBadge.badge))
     )
-    user_badges = result.scalars().all()
+    earned_map = {ub.badge_id: ub.earned_at for ub in earned_result.scalars().all()}
 
     return [
         BadgeOut(
-            id=ub.badge.id,
-            name=ub.badge.name,
-            description=ub.badge.description,
-            icon=ub.badge.icon,
-            category=ub.badge.category,
-            rarity=ub.badge.rarity,
-            earned_at=ub.earned_at,
+            id=b.id,
+            name=b.name,
+            description=b.description,
+            icon=b.icon,
+            category=b.category,
+            rarity=b.rarity,
+            xp_bonus=b.xp_bonus,
+            earned=b.id in earned_map,
+            earned_at=earned_map.get(b.id),
         )
-        for ub in user_badges
+        for b in all_badges
     ]

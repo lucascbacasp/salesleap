@@ -388,23 +388,27 @@ async def admin_seed_industria(x_admin_key: str = Header(...)):
                 results.append("Onboarding path already exists")
 
             # ── 3. Modules + lessons ──
-            total_lessons = 0
-            for mod_data in copy.deepcopy(ONBOARDING_MODULES):
-                lessons_data = mod_data.pop("lessons")
-                mod_exists = await db.execute(
-                    select(Module).where(Module.id == mod_data["id"])
-                )
-                if not mod_exists.scalar_one_or_none():
+            # First, check how many modules currently exist for this path
+            existing_mods_result = await db.execute(
+                select(Module).where(Module.path_id == ONBOARDING_PATH["id"])
+            )
+            existing_mods = existing_mods_result.scalars().all()
+
+            if existing_mods:
+                # Already have modules for this path — skip (idempotent)
+                total_lessons = sum(1 for _ in existing_mods)  # rough count for reporting
+                results.append(f"Modules already exist for onboarding path ({len(existing_mods)} modules)")
+            else:
+                total_lessons = 0
+                for mod_data in copy.deepcopy(ONBOARDING_MODULES):
+                    lessons_data = mod_data.pop("lessons")
                     module = Module(**mod_data)
                     db.add(module)
                     await db.flush()
                     for lesson_data in lessons_data:
                         db.add(Lesson(module_id=module.id, is_published=True, **lesson_data))
                         total_lessons += 1
-            if total_lessons:
-                results.append(f"{total_lessons} lessons created across 3 modules")
-            else:
-                results.append("Modules + lessons already exist")
+                results.append(f"{total_lessons} lessons created across {len(ONBOARDING_MODULES)} modules")
 
             # ── 4. Users ──
             for u_data in INDUSTRIA_USERS:

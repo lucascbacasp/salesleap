@@ -868,7 +868,7 @@ ONBOARDING_PATH = {
 ONBOARDING_MODULES = [
     # ── Nivel 1 — Explorador (días 1-2) ──────────────────────
     {
-        "id": uuid.UUID("c0000000-0000-0000-0000-000000000001"),
+        "id": uuid.UUID("c0000000-0000-0000-0000-000000000007"),
         "path_id": uuid.UUID("b0000000-0000-0000-0000-000000000003"),
         "title": "Nivel 1 — Explorador",
         "description": "Días 1 y 2: conocé la planta y orientate en el terreno.",
@@ -944,7 +944,7 @@ ONBOARDING_MODULES = [
     },
     # ── Nivel 2 — Operador (días 3-5) ────────────────────────
     {
-        "id": uuid.UUID("c0000000-0000-0000-0000-000000000002"),
+        "id": uuid.UUID("c0000000-0000-0000-0000-000000000008"),
         "path_id": uuid.UUID("b0000000-0000-0000-0000-000000000003"),
         "title": "Nivel 2 — Operador",
         "description": "Días 3 a 5: entendé el ciclo del ticket y ejecutá tu primer trabajo real.",
@@ -1036,7 +1036,7 @@ ONBOARDING_MODULES = [
     },
     # ── Nivel 3 — Especialista (días 6-7) ────────────────────
     {
-        "id": uuid.UUID("c0000000-0000-0000-0000-000000000003"),
+        "id": uuid.UUID("c0000000-0000-0000-0000-000000000009"),
         "path_id": uuid.UUID("b0000000-0000-0000-0000-000000000003"),
         "title": "Nivel 3 — Especialista",
         "description": "Días 6 y 7: resolvé situaciones complejas y obtené tu certificación.",

@@ -12,6 +12,8 @@ class BadgeOut(BaseModel):
     icon: Optional[str] = None
     category: str
     rarity: str
+    xp_bonus: int = 0
+    earned: bool = False
     earned_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
