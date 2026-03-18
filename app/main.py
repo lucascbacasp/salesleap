@@ -9,7 +9,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.core.config import settings
 from app.core.database import async_session, engine, init_db
@@ -342,6 +342,130 @@ async def admin_seed_demo(x_admin_key: str = Header(...)):
 
         await db.commit()
         results.append("Demo data seeded successfully!")
+
+    return {"results": results}
+
+
+@app.post("/api/admin/seed-industria")
+async def admin_seed_industria(x_admin_key: str = Header(...)):
+    """Seed Industria Demo company + onboarding journey (7-day gamified path) + 2 users."""
+    if x_admin_key != settings.SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    import copy
+    from datetime import datetime, timezone
+    from app.models.models import (
+        Company, LearningPath, Module, Lesson, User, UserRole,
+        UserPathProgress, ProgressStatus,
+    )
+
+    results = []
+
+    try:
+        from seed import INDUSTRIA_COMPANY, ONBOARDING_PATH, ONBOARDING_MODULES, INDUSTRIA_USERS
+
+        async with async_session() as db:
+            # ── 1. Company ──
+            company_result = await db.execute(
+                select(Company).where(Company.email_domain == "industria.app")
+            )
+            if not company_result.scalar_one_or_none():
+                db.add(Company(**INDUSTRIA_COMPANY))
+                await db.flush()
+                results.append("Company 'Industria Demo' created")
+            else:
+                results.append("Company 'Industria Demo' already exists")
+
+            # ── 2. Onboarding path ──
+            path_result = await db.execute(
+                select(LearningPath).where(LearningPath.id == ONBOARDING_PATH["id"])
+            )
+            if not path_result.scalar_one_or_none():
+                db.add(LearningPath(**ONBOARDING_PATH))
+                await db.flush()
+                results.append("Onboarding path created")
+            else:
+                results.append("Onboarding path already exists")
+
+            # ── 3. Modules + lessons ──
+            total_lessons = 0
+            for mod_data in copy.deepcopy(ONBOARDING_MODULES):
+                lessons_data = mod_data.pop("lessons")
+                mod_exists = await db.execute(
+                    select(Module).where(Module.id == mod_data["id"])
+                )
+                if not mod_exists.scalar_one_or_none():
+                    module = Module(**mod_data)
+                    db.add(module)
+                    await db.flush()
+                    for lesson_data in lessons_data:
+                        db.add(Lesson(module_id=module.id, is_published=True, **lesson_data))
+                        total_lessons += 1
+            if total_lessons:
+                results.append(f"{total_lessons} lessons created across 3 modules")
+            else:
+                results.append("Modules + lessons already exist")
+
+            # ── 4. Users ──
+            for u_data in INDUSTRIA_USERS:
+                u_result = await db.execute(
+                    select(User).where(User.email == u_data["email"])
+                )
+                user = u_result.scalar_one_or_none()
+                if not user:
+                    user = User(
+                        email=u_data["email"],
+                        full_name=u_data["full_name"],
+                        role=UserRole(u_data["role"]),
+                        company_id=INDUSTRIA_COMPANY["id"],
+                        industry="manufactura",
+                        experience_level="beginner",
+                        email_verified=True,
+                        onboarding_done=u_data["onboarding_done"],
+                        is_active=True,
+                    )
+                    db.add(user)
+                    await db.flush()
+                    if not u_data["onboarding_done"]:
+                        db.add(UserPathProgress(
+                            user_id=user.id,
+                            path_id=ONBOARDING_PATH["id"],
+                            status=ProgressStatus.in_progress,
+                            started_at=datetime.now(timezone.utc),
+                        ))
+                    results.append(f"User '{u_data['full_name']}' ({u_data['email']}) created")
+                else:
+                    results.append(f"User '{u_data['full_name']}' already exists")
+
+            # ── 5. Insert new onboarding badges (idempotent) ──
+            NEW_BADGES = [
+                ("Orientado",    "Completaste el mapa del área en tu primer día",    "🗺️", "onboarding", '{"onboarding_lesson": "El mapa del área"}',              75,  "common"),
+                ("En acción",    "Completaste tu primer ticket real",                 "⚙️", "onboarding", '{"onboarding_lesson": "Primer ticket real"}',            100, "rare"),
+                ("Especialista", "Certificado como Operador Junior",                  "🎓", "onboarding", '{"onboarding_lesson": "Certificación: Operador Junior"}', 150, "epic"),
+            ]
+            badges_added = 0
+            for name, desc, icon, cat, criteria_json, xp_bonus, rarity in NEW_BADGES:
+                exists = await db.execute(
+                    text("SELECT 1 FROM badges WHERE name = :n"),
+                    {"n": name}
+                )
+                if not exists.scalar_one_or_none():
+                    await db.execute(
+                        text("""
+                            INSERT INTO badges (name, description, icon, category, criteria, xp_bonus, rarity)
+                            VALUES (:name, :desc, :icon, :cat, :criteria::jsonb, :xp, :rarity)
+                        """),
+                        {"name": name, "desc": desc, "icon": icon, "cat": cat,
+                         "criteria": criteria_json, "xp": xp_bonus, "rarity": rarity}
+                    )
+                    badges_added += 1
+            results.append(f"{badges_added} new onboarding badges added")
+
+            await db.commit()
+            results.append("✅ Industria Demo seeded successfully!")
+
+    except Exception as e:
+        results.append(f"ERROR: {str(e)}")
 
     return {"results": results}
 

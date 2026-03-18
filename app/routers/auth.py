@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.core.auth import create_jwt, create_magic_token
 from app.core.config import settings
 from app.core.deps import DB
-from app.models.models import AuthToken, Company, User, UserRole
+from app.models.models import AuthToken, Company, LearningPath, User, UserPathProgress, UserRole, ProgressStatus
 from app.schemas.auth import AuthResponse, MagicLinkRequest, MagicLinkResponse, VerifyTokenRequest
 
 # Emails that automatically get admin role on first login
@@ -58,6 +58,27 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
 
         db.add(user)
         await db.flush()
+
+        # Auto-assign onboarding path if the company has one (industry="onboarding")
+        if user.company_id and not user.onboarding_done and body.email.lower() not in ADMIN_EMAILS:
+            onb_path_result = await db.execute(
+                select(LearningPath).where(
+                    LearningPath.company_id == user.company_id,
+                    LearningPath.industry == "onboarding",
+                    LearningPath.is_published.is_(True),
+                ).limit(1)
+            )
+            onb_path = onb_path_result.scalar_one_or_none()
+            if onb_path:
+                db.add(UserPathProgress(
+                    user_id=user.id,
+                    path_id=onb_path.id,
+                    status=ProgressStatus.in_progress,
+                    started_at=datetime.now(timezone.utc),
+                ))
+                user.onboarding_done = True  # skip quiz, go straight to dashboard
+                await db.flush()
+
     else:
         # Existing user — ensure admin emails always have admin role
         if body.email.lower() in ADMIN_EMAILS and user.role == UserRole.learner:

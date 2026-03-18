@@ -107,6 +107,8 @@ async def check_badges(
             earned = True
         elif "lesson_under_seconds" in criteria and time_spent is not None and time_spent <= criteria["lesson_under_seconds"]:
             earned = True
+        elif "onboarding_lesson" in criteria and lesson is not None and lesson.title.lower() == criteria["onboarding_lesson"].lower():
+            earned = True
 
         if earned:
             user_badge = UserBadge(user_id=user.id, badge_id=badge.id)

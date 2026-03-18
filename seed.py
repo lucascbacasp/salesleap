@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 from app.core.database import async_session, engine
 from app.models.models import (
-    Company, LearningPath, Module, Lesson,
+    Company, LearningPath, Module, Lesson, User, UserRole, UserPathProgress, ProgressStatus,
 )
 
 # ============================================================
@@ -839,6 +839,307 @@ INMOB_MODULES = [
 ]
 
 
+# ============================================================
+# INDUSTRIA DEMO — Empresa + Onboarding Journey 7 días
+# ============================================================
+INDUSTRIA_COMPANY = {
+    "id": uuid.UUID("a0000000-0000-0000-0000-000000000003"),
+    "name": "Industria Demo",
+    "slug": "industria-demo",
+    "email_domain": "industria.app",
+    "industry": "manufactura",
+    "plan": "pro",
+    "is_active": True,
+    "settings": {},
+}
+
+ONBOARDING_PATH = {
+    "id": uuid.UUID("b0000000-0000-0000-0000-000000000003"),
+    "title": "Onboarding: De cero a operador en 7 días",
+    "description": "Tu journey de incorporación gamificado. Completá las misiones de cada nivel para convertirte en un operador certificado.",
+    "industry": "onboarding",
+    "level": "beginner",
+    "company_id": uuid.UUID("a0000000-0000-0000-0000-000000000003"),
+    "xp_reward": 500,
+    "order_index": 0,
+    "is_published": True,
+}
+
+ONBOARDING_MODULES = [
+    # ── Nivel 1 — Explorador (días 1-2) ──────────────────────
+    {
+        "id": uuid.UUID("c0000000-0000-0000-0000-000000000001"),
+        "path_id": uuid.UUID("b0000000-0000-0000-0000-000000000003"),
+        "title": "Nivel 1 — Explorador",
+        "description": "Días 1 y 2: conocé la planta y orientate en el terreno.",
+        "order_index": 0,
+        "xp_reward": 70,
+        "estimated_minutes": 20,
+        "is_published": True,
+        "lessons": [
+            {
+                "title": "Bienvenida a la planta",
+                "lesson_type": "theory",
+                "order_index": 0,
+                "xp_reward": 30,
+                "estimated_minutes": 8,
+                "content": {
+                    "text": "Bienvenido a tu primer día. Antes de operar cualquier máquina o proceso, necesitás conocer el terreno: quiénes son tus compañeros de turno, dónde están las salidas de emergencia, cuáles son las zonas restringidas y qué significa cada color en el piso de la planta.\n\nEn manufactura, el conocimiento del entorno físico no es opcional — es seguridad, es eficiencia y es la base de todo lo que viene después.",
+                    "key_points": [
+                        "Identificá los 3 colores de piso más comunes: amarillo (tránsito), rojo (peligro/emergencia), verde (seguridad)",
+                        "Memorizá la ubicación de los 2 extintores más cercanos a tu puesto",
+                        "Conocé el nombre de tu supervisor de turno y cómo contactarlo en caso de problema",
+                        "Nunca operés una máquina sin haber leído el procedimiento operativo estándar (POE)",
+                        "El check-in de inicio de turno no es burocracia — es el primer control de calidad del día",
+                    ],
+                    "summary": "El primer día es de observación. Antes de tocar nada, mirá, preguntá y aprendé el lenguaje físico de la planta.",
+                },
+            },
+            {
+                "title": "El mapa del área",
+                "lesson_type": "challenge",
+                "order_index": 1,
+                "xp_reward": 40,
+                "estimated_minutes": 10,
+                "content": {
+                    "text": "Ahora que recorriste la planta, es momento de demostrar que entendiste la distribución. Este desafío te pide que identifiques correctamente zonas, herramientas y protocolos.",
+                    "questions": [
+                        {
+                            "question": "¿Qué significan las líneas amarillas pintadas en el piso de una planta industrial?",
+                            "options": [
+                                "Zona de descarte de residuos",
+                                "Pasillos de tránsito peatonal y de vehículos",
+                                "Área de alta temperatura",
+                                "Zona de carga y descarga exclusiva",
+                            ],
+                            "correct": 1,
+                            "explanation": "Las líneas amarillas demarcan los pasillos de circulación. Respetarlas evita accidentes con montacargas y mantiene el flujo productivo ordenado.",
+                        },
+                        {
+                            "question": "Al inicio de cada turno, ¿cuál es el primer paso antes de operar tu puesto?",
+                            "options": [
+                                "Encender la máquina y verificar que funcione",
+                                "Registrar el check-in y revisar el estado del turno anterior en la bitácora",
+                                "Pedir las herramientas al depósito",
+                                "Reportarse con el supervisor de otra área",
+                            ],
+                            "correct": 1,
+                            "explanation": "La bitácora del turno anterior te dice qué problemas hubo, qué quedó pendiente y si hay alguna alerta activa. Es información crítica antes de arrancar.",
+                        },
+                        {
+                            "question": "¿Cuándo debés usar los EPP (equipos de protección personal)?",
+                            "options": [
+                                "Solo cuando el supervisor está mirando",
+                                "Únicamente en zonas señalizadas como peligrosas",
+                                "Siempre que estés dentro del área de producción, sin excepciones",
+                                "Solo al manipular químicos o materiales peligrosos",
+                            ],
+                            "correct": 2,
+                            "explanation": "Los EPP son obligatorios en todo el área de producción, sin importar la tarea. Un accidente puede ocurrir en cualquier momento — la protección no es situacional.",
+                        },
+                    ],
+                },
+            },
+        ],
+    },
+    # ── Nivel 2 — Operador (días 3-5) ────────────────────────
+    {
+        "id": uuid.UUID("c0000000-0000-0000-0000-000000000002"),
+        "path_id": uuid.UUID("b0000000-0000-0000-0000-000000000003"),
+        "title": "Nivel 2 — Operador",
+        "description": "Días 3 a 5: entendé el ciclo del ticket y ejecutá tu primer trabajo real.",
+        "order_index": 1,
+        "xp_reward": 110,
+        "estimated_minutes": 25,
+        "is_published": True,
+        "lessons": [
+            {
+                "title": "El ciclo del ticket",
+                "lesson_type": "quiz",
+                "order_index": 0,
+                "xp_reward": 50,
+                "estimated_minutes": 10,
+                "content": {
+                    "text": "Cada tarea en la planta se gestiona a través de un ticket de trabajo: una orden que documenta qué hay que hacer, quién lo hace, en qué tiempo y con qué resultado. Entender el ciclo completo del ticket es entender cómo fluye el trabajo.",
+                    "questions": [
+                        {
+                            "question": "¿Cuál es el primer estado de un ticket cuando se genera una orden de trabajo?",
+                            "options": [
+                                "En progreso",
+                                "Pendiente de asignación",
+                                "Cerrado",
+                                "En revisión de calidad",
+                            ],
+                            "correct": 1,
+                            "explanation": "Todo ticket nace como 'Pendiente de asignación'. Solo cuando un operador lo toma y confirma, pasa a 'En progreso'. Esto garantiza trazabilidad desde el origen.",
+                        },
+                        {
+                            "question": "¿Cuándo podés cerrar un ticket de trabajo?",
+                            "options": [
+                                "Cuando terminaste la tarea física, aunque falte documentación",
+                                "Solo cuando el supervisor lo aprueba, sin importar si terminaste",
+                                "Cuando la tarea está completa, documentada y verificada por calidad",
+                                "Cuando pasaron 8 horas desde que lo tomaste",
+                            ],
+                            "correct": 2,
+                            "explanation": "Un ticket cerrado incorrectamente genera problemas río abajo. La tripleta completa es: tarea ejecutada + documentación completa + verificación de calidad.",
+                        },
+                        {
+                            "question": "Si encontrás un problema no contemplado en el ticket durante la ejecución, ¿qué hacés?",
+                            "options": [
+                                "Lo resolvés por tu cuenta para no perder tiempo",
+                                "Ignorás el problema y cerrás el ticket igual",
+                                "Pausás el ticket, documentás el hallazgo y avisás al supervisor",
+                                "Transferís el ticket a otro operador",
+                            ],
+                            "correct": 2,
+                            "explanation": "Un problema no reportado es un problema que se repetirá. Pausar, documentar y escalar es el procedimiento correcto — protege tu trabajo y mejora el proceso.",
+                        },
+                    ],
+                },
+            },
+            {
+                "title": "Primer ticket real",
+                "lesson_type": "challenge",
+                "order_index": 1,
+                "xp_reward": 60,
+                "estimated_minutes": 12,
+                "content": {
+                    "text": "Este es tu primer ticket real simulado. Leé la orden de trabajo, tomá decisiones como operador y demostrá que entendiste el proceso.",
+                    "questions": [
+                        {
+                            "question": "Tu ticket dice: 'Cambio de filtro de aire en Línea 3 — Urgente'. Al llegar, notás que el filtro correcto no está en el stock del puesto. ¿Qué hacés?",
+                            "options": [
+                                "Usás el filtro más parecido que encontrés para no demorar",
+                                "Cerrás el ticket como 'No se pudo ejecutar' y seguís con otro",
+                                "Registrás el faltante en la bitácora, avisás a tu supervisor y solicitás el insumo al depósito antes de continuar",
+                                "Esperás hasta el próximo turno para que llegue el material",
+                            ],
+                            "correct": 2,
+                            "explanation": "Nunca improvises con piezas incorrectas — en manufactura eso puede causar fallas en cascada. El procedimiento es: documentar, escalar, solicitar. Solo entonces ejecutar.",
+                        },
+                        {
+                            "question": "Terminaste la tarea. El sistema te pide ingresar el tiempo real de ejecución. Tu estimación fue 30 min pero tardaste 55 min. ¿Qué ingresás?",
+                            "options": [
+                                "30 min, para no quedar mal en las métricas",
+                                "55 min con una nota explicando el motivo de la demora",
+                                "0 min porque el tiempo ya pasó y no importa",
+                                "Un promedio entre los dos tiempos",
+                            ],
+                            "correct": 1,
+                            "explanation": "Los datos reales son oro para la mejora continua. Si tardaste 55 min con una causa justificada, ese dato ayuda a recalibrar las estimaciones futuras. Falsear métricas destruye la confianza del sistema.",
+                        },
+                    ],
+                },
+            },
+        ],
+    },
+    # ── Nivel 3 — Especialista (días 6-7) ────────────────────
+    {
+        "id": uuid.UUID("c0000000-0000-0000-0000-000000000003"),
+        "path_id": uuid.UUID("b0000000-0000-0000-0000-000000000003"),
+        "title": "Nivel 3 — Especialista",
+        "description": "Días 6 y 7: resolvé situaciones complejas y obtené tu certificación.",
+        "order_index": 2,
+        "xp_reward": 150,
+        "estimated_minutes": 30,
+        "is_published": True,
+        "lessons": [
+            {
+                "title": "Diagnóstico de proceso",
+                "lesson_type": "roleplay",
+                "order_index": 0,
+                "xp_reward": 70,
+                "estimated_minutes": 15,
+                "content": {
+                    "scenario": "Son las 14:30 del turno tarde. La Línea 2 empieza a producir piezas con rebabas visibles — defecto de calidad nivel 2. Hay un pedido urgente de 200 unidades para despachar a las 17:00. El supervisor no está disponible en este momento. Sos el operador con más horas en el turno.\n\nDescribí los pasos que tomarías: ¿parás la línea o seguís produciendo? ¿a quién avisás primero? ¿cómo documentás el incidente?",
+                    "objective": "Demostrar criterio para gestionar un defecto de calidad bajo presión de tiempo, priorizando correctamente calidad, comunicación y documentación.",
+                    "evaluation_criteria": [
+                        "Parar la línea inmediatamente ante un defecto detectado",
+                        "Notificar a supervisor/líder de turno aunque no esté disponible de forma directa",
+                        "No despachar piezas defectuosas bajo ninguna circunstancia",
+                        "Documentar el incidente con hora, cantidad afectada y descripción del defecto",
+                        "Proponer acción correctiva o pedir asistencia técnica",
+                    ],
+                },
+            },
+            {
+                "title": "Certificación: Operador Junior",
+                "lesson_type": "challenge",
+                "order_index": 1,
+                "xp_reward": 80,
+                "estimated_minutes": 15,
+                "content": {
+                    "text": "Esta es tu evaluación final de los 7 días. Respondé correctamente para obtener la certificación de Operador Junior y el badge 🎓 Especialista.",
+                    "questions": [
+                        {
+                            "question": "¿Cuál es la prioridad número 1 en el piso de una planta industrial?",
+                            "options": [
+                                "Cumplir los tiempos de producción",
+                                "Mantener la calidad del producto",
+                                "La seguridad de las personas",
+                                "Minimizar el desperdicio de materiales",
+                            ],
+                            "correct": 2,
+                            "explanation": "Seguridad siempre primero. Ninguna métrica de productividad o calidad vale un accidente. En manufactura esto es un valor no negociable.",
+                        },
+                        {
+                            "question": "Un compañero nuevo te pide que le enseñes un 'atajo' que no está en el procedimiento. ¿Qué hacés?",
+                            "options": [
+                                "Se lo mostrás porque funciona y ahorra tiempo",
+                                "Se lo mostrás pero le pedís discreción",
+                                "Le explicás que los atajos no documentados son riesgos — si es una mejora real, hay que validarla y actualizar el POE",
+                                "Lo ignorás y no le respondés",
+                            ],
+                            "correct": 2,
+                            "explanation": "Los atajos no documentados son fuentes de accidentes y defectos. Si es una mejora genuina, el camino es proponer la actualización del procedimiento. Así se construye una cultura de mejora continua.",
+                        },
+                        {
+                            "question": "Al final de tu turno, la bitácora del turno siguiente ya tiene información registrada incorrectamente por un error tuyo. ¿Qué hacés?",
+                            "options": [
+                                "No hacés nada — ya fue, es problema del siguiente turno",
+                                "Borrás el registro antes de irte",
+                                "Corrección: hacés una enmienda firmada con hora y tu nombre, explicando el error",
+                                "Le mandás un mensaje privado al supervisor sin documentar nada",
+                            ],
+                            "correct": 2,
+                            "explanation": "Las bitácoras son documentos de trazabilidad. Nunca se borran — se enmiendan. Una enmienda firmada y fechada mantiene la integridad del registro y demuestra responsabilidad.",
+                        },
+                        {
+                            "question": "Completaste tu onboarding de 7 días. ¿Cuál es el mejor indicador de que estás listo para operar de forma independiente?",
+                            "options": [
+                                "Memorizaste todos los procedimientos de memoria",
+                                "No hiciste ningún error en la semana",
+                                "Sabés dónde encontrar la información que necesitás y a quién preguntar cuando no sabés",
+                                "El supervisor te dijo que sos el mejor del turno",
+                            ],
+                            "correct": 2,
+                            "explanation": "Nadie memoriza todo. Un operador competente sabe que el conocimiento está en los procedimientos y en el equipo. Saber buscar y preguntar es la meta-habilidad más valiosa.",
+                        },
+                    ],
+                },
+            },
+        ],
+    },
+]
+
+# ── Usuarios demo de Industria Demo ──────────────────────────
+INDUSTRIA_USERS = [
+    {
+        "email": "nuevo@industria.app",
+        "full_name": "Nuevo Empleado",
+        "role": "learner",
+        "onboarding_done": False,
+    },
+    {
+        "email": "admin@industria.app",
+        "full_name": "Admin Industria",
+        "role": "manager",
+        "onboarding_done": True,
+    },
+]
+
+
 async def seed():
     print("🌱 Seeding SalesLeap database...")
 
@@ -894,23 +1195,70 @@ async def seed():
                     db.add(lesson)
                     total_lessons += 1
 
+        # ── Industria Demo: empresa + onboarding path ──
+        import copy as _copy
+        industria = Company(**INDUSTRIA_COMPANY)
+        db.add(industria)
+        await db.flush()
+
+        onb_path = LearningPath(**ONBOARDING_PATH)
+        db.add(onb_path)
+        await db.flush()
+
+        for mod_data in _copy.deepcopy(ONBOARDING_MODULES):
+            lessons_data = mod_data.pop("lessons")
+            module = Module(**mod_data)
+            db.add(module)
+            await db.flush()
+            total_modules += 1
+            for lesson_data in lessons_data:
+                db.add(Lesson(module_id=module.id, is_published=True, **lesson_data))
+                total_lessons += 1
+
+        # ── Usuarios demo de Industria ──
+        from datetime import datetime, timezone
+        for u_data in INDUSTRIA_USERS:
+            user = User(
+                email=u_data["email"],
+                full_name=u_data["full_name"],
+                role=UserRole(u_data["role"]),
+                company_id=INDUSTRIA_COMPANY["id"],
+                industry="manufactura",
+                experience_level="beginner",
+                email_verified=True,
+                onboarding_done=u_data["onboarding_done"],
+                is_active=True,
+            )
+            db.add(user)
+            await db.flush()
+            # Auto-asignar onboarding path al usuario learner
+            if not u_data["onboarding_done"]:
+                db.add(UserPathProgress(
+                    user_id=user.id,
+                    path_id=ONBOARDING_PATH["id"],
+                    status=ProgressStatus.in_progress,
+                    started_at=datetime.now(timezone.utc),
+                ))
+
         await db.commit()
         print(f"✅ {total_modules} módulos creados")
         print(f"✅ {total_lessons} lecciones creadas")
+        print(f"✅ Industria Demo: empresa + onboarding journey 7 días + 2 usuarios")
 
         # Summary
         print("\n" + "=" * 50)
         print("📊 RESUMEN DEL SEED")
         print("=" * 50)
-        print(f"  Empresas:  {len(COMPANIES)}")
-        print(f"  Paths:     2")
+        print(f"  Empresas:  {len(COMPANIES) + 1}")
+        print(f"  Paths:     3")
         print(f"  Módulos:   {total_modules}")
         print(f"  Lecciones: {total_lessons}")
         print(f"  Badges:    (ya existentes en schema.sql)")
         print("=" * 50)
         print("\n🎉 ¡Seed completado! La demo está lista.")
-        print("   Ruta auto: 'Venta Consultiva Automotriz' (3 módulos, 12 lecciones)")
+        print("   Ruta auto:  'Venta Consultiva Automotriz' (3 módulos, 12 lecciones)")
         print("   Ruta inmob: 'Cierre Inmobiliario Profesional' (3 módulos, 12 lecciones)")
+        print("   Onboarding: 'De cero a operador en 7 días' (3 niveles, 6 lecciones)")
 
 
 if __name__ == "__main__":

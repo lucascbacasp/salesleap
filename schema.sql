@@ -307,4 +307,7 @@ INSERT INTO badges (name, description, icon, category, criteria, xp_bonus, rarit
 ('Ruta completa',   'Terminaste una ruta de aprendizaje',       '🏆', 'completion',    '{"paths_completed": 1}',       300, 'epic'),
 ('Vendedor Pro',    'Completaste 5 rutas de aprendizaje',       '⭐', 'completion',    '{"paths_completed": 5}',       1000,'legendary'),
 ('Veloz',           'Completaste una lección en menos de 3 min','⚡', 'speed',         '{"lesson_under_seconds": 180}',50,  'rare'),
-('Bienvenido',      'Completaste el quiz de nivelación',        '👋', 'onboarding',    '{"onboarding_done": true}',    100, 'common');
+('Bienvenido',      'Completaste el quiz de nivelación',        '👋', 'onboarding',    '{"onboarding_done": true}',    100, 'common'),
+('Orientado',      'Completaste el mapa del área en tu primer día', '🗺️', 'onboarding', '{"onboarding_lesson": "El mapa del área"}',              75,  'common'),
+('En acción',      'Completaste tu primer ticket real',             '⚙️', 'onboarding', '{"onboarding_lesson": "Primer ticket real"}',            100, 'rare'),
+('Especialista',   'Certificado como Operador Junior',              '🎓', 'onboarding', '{"onboarding_lesson": "Certificación: Operador Junior"}', 150, 'epic');
