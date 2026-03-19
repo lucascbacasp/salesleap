@@ -85,7 +85,7 @@ export default function Dashboard() {
         </h2>
         <p className="text-gray-400 text-sm">
           {user.streak_current > 0
-            ? `🔥 ${user.streak_current} días de racha — ¡seguí así!`
+            ? `🔥 ${user.streak_current} ${user.streak_current === 1 ? 'día' : 'días'} de racha — ¡seguí así!`
             : 'Completá una lección hoy para arrancar tu racha'}
         </p>
       </div>
@@ -99,7 +99,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         <StatCard label="XP Total" value={user.total_xp.toLocaleString()} icon="⭐" />
         <StatCard label="Nivel" value={user.level} icon="📊" />
-        <StatCard label="Racha" value={`${user.streak_current} días`} icon="🔥" />
+        <StatCard label="Racha" value={`${user.streak_current} ${user.streak_current === 1 ? 'día' : 'días'}`} icon="🔥" />
         <StatCard label="Lecciones" value={progress?.total_lessons_completed || 0} icon="📚" />
       </div>
 
