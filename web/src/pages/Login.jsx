@@ -26,7 +26,11 @@ function RequestLink() {
       const data = await api.requestLink(email, name);
       if (data.access_token) {
         login(data.access_token);
-        navigate(data.onboarding_done ? '/dashboard' : '/onboarding', { replace: true });
+        const isAdmin = ['admin', 'manager', 'superadmin'].includes(data.role);
+        navigate(
+          isAdmin ? '/admin' : data.onboarding_done ? '/dashboard' : '/onboarding',
+          { replace: true }
+        );
       }
     } catch (err) {
       setError(err.detail || 'Error al iniciar sesión');
@@ -95,8 +99,10 @@ function VerifyToken({ token }) {
       try {
         const data = await api.verify(token);
         login(data.access_token);
-        // Redirect based on onboarding status
-        if (!data.onboarding_done) {
+        const isAdmin = ['admin', 'manager', 'superadmin'].includes(data.role);
+        if (isAdmin) {
+          navigate('/admin', { replace: true });
+        } else if (!data.onboarding_done) {
           navigate('/onboarding', { replace: true });
         } else {
           navigate('/dashboard', { replace: true });

@@ -147,6 +147,7 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
         user_id=str(user.id),
         is_new_user=is_new,
         onboarding_done=user.onboarding_done,
+        role=user.role.value,
     )
 
 
@@ -184,4 +185,5 @@ async def verify_token(body: VerifyTokenRequest, db: DB):
         user_id=str(user.id),
         is_new_user=is_new,
         onboarding_done=user.onboarding_done,
+        role=user.role.value,
     )

@@ -14,6 +14,7 @@ class MagicLinkResponse(BaseModel):
     user_id: Optional[str] = None
     is_new_user: Optional[bool] = None
     onboarding_done: Optional[bool] = None
+    role: Optional[str] = None
 
 
 class VerifyTokenRequest(BaseModel):
@@ -26,3 +27,4 @@ class AuthResponse(BaseModel):
     user_id: str
     is_new_user: bool
     onboarding_done: bool
+    role: str = "learner"
