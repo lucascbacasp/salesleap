@@ -180,6 +180,7 @@ async def _auto_seed():
                         if u_data["streak"] > 0
                         else datetime.now(timezone.utc) - timedelta(days=random.randint(3, 7))
                     )
+                await db.flush()  # flush before next SELECT in loop to avoid autoflush error
 
             await db.commit()
             logger.info("startup: seed-demo (admin.app) applied")
@@ -317,6 +318,7 @@ async def _auto_seed():
                         if sp["streak"] > 0
                         else datetime.now(timezone.utc) - timedelta(days=random.randint(4, 10))
                     )
+                    await db.flush()  # flush before next SELECT in loop to avoid autoflush error
 
             await db.commit()
             logger.info("startup: seed-auto (auto.app) applied")
