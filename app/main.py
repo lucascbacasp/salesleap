@@ -3,6 +3,7 @@ SalesLeap — FastAPI main application
 """
 import logging
 import copy as _copy
+import os
 import random
 from contextlib import asynccontextmanager
 from datetime import datetime, date, timedelta, timezone
@@ -404,11 +405,16 @@ async def lifespan(app: FastAPI):
     yield
 
 
+_is_prod = os.getenv("ENVIRONMENT", "").lower() == "production"
+
 app = FastAPI(
     title="SalesLeap API",
     version="1.0.0",
     description="Plataforma de capacitación gamificada para vendedores",
     lifespan=lifespan,
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
 )
 
 app.add_middleware(
