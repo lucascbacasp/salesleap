@@ -13,7 +13,7 @@ from sqlalchemy import and_, func, select
 from app.core.deps import DB, CurrentUser, ManagerUser
 from app.models.models import (
     DailyStreak, LearningPath, Module, Lesson, OnboardingResult,
-    User, UserLessonProgress, UserPathProgress, ProgressStatus,
+    User, UserLessonProgress, UserPathProgress, ProgressStatus, UserRole,
 )
 
 router = APIRouter()
@@ -194,9 +194,13 @@ async def get_company_weekly(company_id: UUID, db: DB, user: ManagerUser):
     if user.company_id != company_id and user.role.value != "superadmin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tenés acceso a esta empresa")
 
-    # Get all active users in the company
+    # Get all active learners in the company (exclude managers/admins)
     users_result = await db.execute(
-        select(User).where(User.company_id == company_id, User.is_active.is_(True))
+        select(User).where(
+            User.company_id == company_id,
+            User.is_active.is_(True),
+            User.role == UserRole.learner,
+        )
     )
     users = users_result.scalars().all()
 
