@@ -26,58 +26,10 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
     user = result.scalar_one_or_none()
 
     if user is None:
-        user = User(
-            email=body.email,
-            full_name=body.full_name or body.email.split("@")[0],
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Pedí tu acceso vía quickconsultora@gmail.com",
         )
-        # Auto-assign admin role for known admin emails
-        if body.email.lower() in ADMIN_EMAILS:
-            user.role = UserRole.admin
-            user.full_name = body.full_name or "Admin"
-            user.onboarding_done = True
-
-        # Auto-asociar empresa por dominio de email
-        domain = body.email.split("@")[1]
-        company_result = await db.execute(
-            select(Company).where(Company.email_domain == domain, Company.is_active.is_(True))
-        )
-        company = company_result.scalar_one_or_none()
-        if company:
-            user.company_id = company.id
-            user.industry = company.industry
-
-        # If admin and no company matched by domain, assign to first company
-        if body.email.lower() in ADMIN_EMAILS and not user.company_id:
-            first_company_result = await db.execute(
-                select(Company).where(Company.is_active.is_(True)).order_by(Company.name).limit(1)
-            )
-            first_company = first_company_result.scalar_one_or_none()
-            if first_company:
-                user.company_id = first_company.id
-                user.industry = first_company.industry
-
-        db.add(user)
-        await db.flush()
-
-        # Auto-assign onboarding path if the company has one (industry="onboarding")
-        if user.company_id and not user.onboarding_done and body.email.lower() not in ADMIN_EMAILS:
-            onb_path_result = await db.execute(
-                select(LearningPath).where(
-                    LearningPath.company_id == user.company_id,
-                    LearningPath.industry == "onboarding",
-                    LearningPath.is_published.is_(True),
-                ).limit(1)
-            )
-            onb_path = onb_path_result.scalar_one_or_none()
-            if onb_path:
-                db.add(UserPathProgress(
-                    user_id=user.id,
-                    path_id=onb_path.id,
-                    status=ProgressStatus.in_progress,
-                    started_at=datetime.now(timezone.utc),
-                ))
-                user.onboarding_done = True  # skip quiz, go straight to dashboard
-                await db.flush()
 
     else:
         # Existing user — ensure admin emails always have admin role
