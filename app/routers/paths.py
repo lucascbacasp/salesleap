@@ -6,7 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import DB, CurrentUser
@@ -30,7 +30,14 @@ async def list_paths(
     ).order_by(LearningPath.order_index)
 
     if industry:
-        query = query.where(LearningPath.industry == industry)
+        # Company-specific paths always show (already filtered by company_id above);
+        # only apply industry filter to global paths (company_id IS NULL).
+        query = query.where(
+            or_(
+                LearningPath.company_id == user.company_id,
+                LearningPath.industry == industry,
+            )
+        )
     if level:
         query = query.where(LearningPath.level == level)
 
