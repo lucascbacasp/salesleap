@@ -494,22 +494,24 @@ async def admin_seed_industria(x_admin_key: str = Header(...)):
 
 @app.post("/api/admin/seed-auto")
 async def admin_seed_auto(x_admin_key: str = Header(...)):
-    """Seed Auto Demo company + Pablo (learner) + Admin (manager) para demo automotriz."""
+    """Seed Auto Demo: empresa + Pablo + Admin + 4 vendedores con datos de demo."""
     if x_admin_key != settings.SECRET_KEY:
         raise HTTPException(status_code=403, detail="Invalid admin key")
 
     import uuid as _uuid
-    from datetime import datetime, timezone
+    import random
+    from datetime import datetime, date, timedelta, timezone
     from app.models.models import (
-        Company, LearningPath, User, UserRole, UserPathProgress, ProgressStatus,
+        Company, LearningPath, Module, Lesson, User, UserRole,
+        UserPathProgress, UserLessonProgress, UserBadge, Badge,
+        DailyStreak, ProgressStatus,
     )
 
     results = []
 
     try:
-        from seed import AUTO_APP_COMPANY, AUTO_APP_USERS
+        from seed import AUTO_APP_COMPANY, AUTO_APP_USERS, AUTO_APP_SALESPEOPLE
 
-        # ID del path global de ventas automotrices
         AUTO_PATH_ID = _uuid.UUID("b0000000-0000-0000-0000-000000000001")
 
         async with async_session() as db:
@@ -532,7 +534,7 @@ async def admin_seed_auto(x_admin_key: str = Header(...)):
                 results.append("ERROR: Path 'Venta Consultiva Automotriz' no existe — corré init-db primero")
                 return {"results": results}
 
-            # ── 3. Usuarios ──
+            # ── 3. Usuarios base (Pablo + Admin) ──
             for u_data in AUTO_APP_USERS:
                 u_result = await db.execute(
                     select(User).where(User.email == u_data["email"])
@@ -561,7 +563,6 @@ async def admin_seed_auto(x_admin_key: str = Header(...)):
                     user.onboarding_done = u_data["onboarding_done"]
                     results.append(f"Usuario '{u_data['full_name']}' actualizado")
 
-                # Asignar path automotriz al learner
                 if u_data["role"] == "learner":
                     path_check = await db.execute(
                         select(UserPathProgress).where(
@@ -576,9 +577,157 @@ async def admin_seed_auto(x_admin_key: str = Header(...)):
                             status=ProgressStatus.in_progress,
                             started_at=datetime.now(timezone.utc),
                         ))
-                        results.append(f"  → Path automotriz asignado a {u_data['email']}")
+                        results.append(f"  → Path asignado a {u_data['email']}")
+
+            await db.flush()
+
+            # ── 4. Obtener todas las lecciones del path automotriz ──
+            lessons_result = await db.execute(
+                select(Lesson)
+                .join(Module, Lesson.module_id == Module.id)
+                .where(Module.path_id == AUTO_PATH_ID, Lesson.is_published.is_(True))
+                .order_by(Module.order_index, Lesson.order_index)
+            )
+            all_lessons = lessons_result.scalars().all()
+            if not all_lessons:
+                results.append("ERROR: no hay lecciones — corré init-db primero")
+                return {"results": results}
+            results.append(f"Path tiene {len(all_lessons)} lecciones disponibles")
+
+            # ── 5. Obtener badges por nombre para asignarlos ──
+            badges_result = await db.execute(select(Badge))
+            badge_map = {b.name: b for b in badges_result.scalars().all()}
+
+            # ── 6. Crear/actualizar los 4 vendedores con datos de demo ──
+            today = date.today()
+            monday = today - timedelta(days=today.weekday())
+
+            for sp in AUTO_APP_SALESPEOPLE:
+                # Crear o recuperar usuario
+                u_result = await db.execute(select(User).where(User.email == sp["email"]))
+                user = u_result.scalar_one_or_none()
+                if not user:
+                    user = User(
+                        email=sp["email"],
+                        full_name=sp["full_name"],
+                        role=UserRole.learner,
+                        company_id=AUTO_APP_COMPANY["id"],
+                        industry="auto",
+                        experience_level="beginner",
+                        email_verified=True,
+                        onboarding_done=True,
+                        is_active=True,
+                    )
+                    db.add(user)
+                    await db.flush()
+                else:
+                    user.company_id = AUTO_APP_COMPANY["id"]
+                    user.industry = "auto"
+                    user.email_verified = True
+                    user.onboarding_done = True
+
+                await db.flush()
+
+                # Limpiar progress anterior (idempotente)
+                await db.execute(
+                    text("DELETE FROM user_lesson_progress WHERE user_id = :uid"),
+                    {"uid": user.id},
+                )
+                await db.execute(
+                    text("DELETE FROM user_path_progress WHERE user_id = :uid"),
+                    {"uid": user.id},
+                )
+                await db.execute(
+                    text("DELETE FROM daily_streaks WHERE user_id = :uid"),
+                    {"uid": user.id},
+                )
+                await db.execute(
+                    text("DELETE FROM user_badges WHERE user_id = :uid"),
+                    {"uid": user.id},
+                )
+
+                total = min(sp["lessons_total"], len(all_lessons))
+                this_week = sp["lessons_this_week"]
+                older = total - this_week
+                total_xp = 0
+
+                for i in range(total):
+                    lesson = all_lessons[i]
+                    xp = random.randint(sp["xp_base"] - 8, sp["xp_base"] + 12)
+                    total_xp += xp
+
+                    if i < older:
+                        days_ago = random.randint(7, 21)
+                        completed_at = datetime.now(timezone.utc) - timedelta(
+                            days=days_ago, hours=random.randint(1, 10)
+                        )
                     else:
-                        results.append(f"  → Path automotriz ya asignado a {u_data['email']}")
+                        day_offset = min(i - older, (today - monday).days)
+                        completed_at = datetime(
+                            monday.year, monday.month, monday.day,
+                            random.randint(8, 20), random.randint(0, 59),
+                            tzinfo=timezone.utc,
+                        ) + timedelta(days=day_offset)
+
+                    db.add(UserLessonProgress(
+                        user_id=user.id,
+                        lesson_id=lesson.id,
+                        status=ProgressStatus.completed,
+                        score=random.randint(72, 100),
+                        attempts=random.randint(1, 3),
+                        time_spent_sec=random.randint(90, 540),
+                        completed_at=completed_at,
+                    ))
+
+                # Path progress
+                db.add(UserPathProgress(
+                    user_id=user.id,
+                    path_id=AUTO_PATH_ID,
+                    status=ProgressStatus.completed if total >= len(all_lessons) else ProgressStatus.in_progress,
+                    started_at=datetime.now(timezone.utc) - timedelta(days=21),
+                    xp_earned=total_xp,
+                ))
+
+                # Daily streaks para esta semana
+                for day_offset in range(min(this_week, (today - monday).days + 1)):
+                    streak_date = monday + timedelta(days=day_offset)
+                    db.add(DailyStreak(
+                        user_id=user.id,
+                        activity_date=streak_date,
+                        xp_earned=random.randint(35, 55),
+                        lessons_done=random.randint(1, 3),
+                    ))
+
+                # Badges
+                for badge_name in sp["badge_names"]:
+                    badge = badge_map.get(badge_name)
+                    if badge:
+                        db.add(UserBadge(
+                            user_id=user.id,
+                            badge_id=badge.id,
+                            earned_at=datetime.now(timezone.utc) - timedelta(
+                                days=random.randint(1, 14)
+                            ),
+                            context={},
+                        ))
+
+                # Actualizar stats del usuario
+                user.total_xp = total_xp
+                user.level = max(1, total_xp // 500 + 1)
+                user.streak_current = sp["streak"]
+                user.streak_max = sp["streak_max"]
+                user.last_activity_at = (
+                    datetime.now(timezone.utc) - timedelta(hours=random.randint(1, 6))
+                    if sp["streak"] > 0
+                    else datetime.now(timezone.utc) - timedelta(days=random.randint(4, 10))
+                )
+
+                results.append(
+                    f"{sp['full_name']} ({sp['email']}): "
+                    f"{total} lecciones, {this_week} esta semana, "
+                    f"racha={sp['streak']}d, xp={total_xp}, "
+                    f"badges={sp['badge_names']}"
+                )
 
             await db.commit()
             results.append("✅ Auto Demo seeded successfully!")

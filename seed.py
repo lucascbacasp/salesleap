@@ -1168,6 +1168,54 @@ AUTO_APP_USERS = [
     },
 ]
 
+# Vendedores con datos ficticios para demo del panel de manager
+AUTO_APP_SALESPEOPLE = [
+    {
+        "email": "lucas@auto.app",
+        "full_name": "Lucas García",
+        # ⭐ Star performer — racha alta, cerca de terminar el path
+        "lessons_total": 10,
+        "lessons_this_week": 5,
+        "streak": 5,
+        "streak_max": 12,
+        "xp_base": 48,
+        "badge_names": ["Primer Paso", "En Racha", "Perfeccionista"],
+    },
+    {
+        "email": "sergio@auto.app",
+        "full_name": "Sergio Ramírez",
+        # 📈 Buen ritmo — constante, cumple la meta semanal
+        "lessons_total": 7,
+        "lessons_this_week": 3,
+        "streak": 3,
+        "streak_max": 6,
+        "xp_base": 40,
+        "badge_names": ["Primer Paso", "En Racha"],
+    },
+    {
+        "email": "andres@auto.app",
+        "full_name": "Andrés López",
+        # ⚠️ Irregular — avanzó antes pero frenó esta semana
+        "lessons_total": 4,
+        "lessons_this_week": 1,
+        "streak": 1,
+        "streak_max": 3,
+        "xp_base": 35,
+        "badge_names": ["Primer Paso"],
+    },
+    {
+        "email": "laura@auto.app",
+        "full_name": "Laura Martínez",
+        # 🔴 Inactiva — solo completó 1 lección hace días, sin actividad reciente
+        "lessons_total": 1,
+        "lessons_this_week": 0,
+        "streak": 0,
+        "streak_max": 1,
+        "xp_base": 30,
+        "badge_names": ["Primer Paso"],
+    },
+]
+
 
 async def seed():
     print("🌱 Seeding SalesLeap database...")
