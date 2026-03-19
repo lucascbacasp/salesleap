@@ -81,7 +81,9 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        # Remove the macOS-generated lockfile so npm resolves platform-native
+        # binaries (lightningcss, @tailwindcss/oxide) fresh for linux-x64-gnu
+        run: rm -f package-lock.json && npm install --legacy-peer-deps
 
       - name: Build
         run: npx vite build
