@@ -1139,6 +1139,35 @@ INDUSTRIA_USERS = [
     },
 ]
 
+# ============================================================
+# AUTO DEMO — auto.app
+# ============================================================
+AUTO_APP_COMPANY = {
+    "id": uuid.UUID("a0000000-0000-0000-0000-000000000004"),
+    "name": "Auto Demo",
+    "slug": "auto-demo",
+    "email_domain": "auto.app",
+    "industry": "auto",
+    "plan": "pro",
+    "is_active": True,
+    "settings": {},
+}
+
+AUTO_APP_USERS = [
+    {
+        "email": "pablo@auto.app",
+        "full_name": "Pablo",
+        "role": "learner",
+        "onboarding_done": True,
+    },
+    {
+        "email": "admin@auto.app",
+        "full_name": "Admin",
+        "role": "manager",
+        "onboarding_done": True,
+    },
+]
+
 
 async def seed():
     print("🌱 Seeding SalesLeap database...")

@@ -492,6 +492,103 @@ async def admin_seed_industria(x_admin_key: str = Header(...)):
     return {"results": results}
 
 
+@app.post("/api/admin/seed-auto")
+async def admin_seed_auto(x_admin_key: str = Header(...)):
+    """Seed Auto Demo company + Pablo (learner) + Admin (manager) para demo automotriz."""
+    if x_admin_key != settings.SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    import uuid as _uuid
+    from datetime import datetime, timezone
+    from app.models.models import (
+        Company, LearningPath, User, UserRole, UserPathProgress, ProgressStatus,
+    )
+
+    results = []
+
+    try:
+        from seed import AUTO_APP_COMPANY, AUTO_APP_USERS
+
+        # ID del path global de ventas automotrices
+        AUTO_PATH_ID = _uuid.UUID("b0000000-0000-0000-0000-000000000001")
+
+        async with async_session() as db:
+            # ── 1. Empresa ──
+            company_result = await db.execute(
+                select(Company).where(Company.email_domain == "auto.app")
+            )
+            if not company_result.scalar_one_or_none():
+                db.add(Company(**AUTO_APP_COMPANY))
+                await db.flush()
+                results.append("Company 'Auto Demo' creada")
+            else:
+                results.append("Company 'Auto Demo' ya existe")
+
+            # ── 2. Verificar que el path automotriz existe ──
+            path_result = await db.execute(
+                select(LearningPath).where(LearningPath.id == AUTO_PATH_ID)
+            )
+            if not path_result.scalar_one_or_none():
+                results.append("ERROR: Path 'Venta Consultiva Automotriz' no existe — corré init-db primero")
+                return {"results": results}
+
+            # ── 3. Usuarios ──
+            for u_data in AUTO_APP_USERS:
+                u_result = await db.execute(
+                    select(User).where(User.email == u_data["email"])
+                )
+                user = u_result.scalar_one_or_none()
+                if not user:
+                    user = User(
+                        email=u_data["email"],
+                        full_name=u_data["full_name"],
+                        role=UserRole(u_data["role"]),
+                        company_id=AUTO_APP_COMPANY["id"],
+                        industry="auto",
+                        experience_level="beginner",
+                        email_verified=True,
+                        onboarding_done=u_data["onboarding_done"],
+                        is_active=True,
+                    )
+                    db.add(user)
+                    await db.flush()
+                    results.append(f"Usuario '{u_data['full_name']}' ({u_data['email']}) creado")
+                else:
+                    user.company_id = AUTO_APP_COMPANY["id"]
+                    user.industry = "auto"
+                    user.email_verified = True
+                    user.role = UserRole(u_data["role"])
+                    user.onboarding_done = u_data["onboarding_done"]
+                    results.append(f"Usuario '{u_data['full_name']}' actualizado")
+
+                # Asignar path automotriz al learner
+                if u_data["role"] == "learner":
+                    path_check = await db.execute(
+                        select(UserPathProgress).where(
+                            UserPathProgress.user_id == user.id,
+                            UserPathProgress.path_id == AUTO_PATH_ID,
+                        )
+                    )
+                    if not path_check.scalar_one_or_none():
+                        db.add(UserPathProgress(
+                            user_id=user.id,
+                            path_id=AUTO_PATH_ID,
+                            status=ProgressStatus.in_progress,
+                            started_at=datetime.now(timezone.utc),
+                        ))
+                        results.append(f"  → Path automotriz asignado a {u_data['email']}")
+                    else:
+                        results.append(f"  → Path automotriz ya asignado a {u_data['email']}")
+
+            await db.commit()
+            results.append("✅ Auto Demo seeded successfully!")
+
+    except Exception as e:
+        results.append(f"ERROR: {str(e)}")
+
+    return {"results": results}
+
+
 # ── Serve React SPA (must be AFTER all API routes) ──────────
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
