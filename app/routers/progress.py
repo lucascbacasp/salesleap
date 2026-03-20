@@ -1,19 +1,21 @@
 """
-GET /api/progress/me                        → progreso del usuario actual
-GET /api/progress/mission                   → misión diaria (3 lecciones/día)
-GET /api/progress/company/{id}              → progreso de la empresa
-GET /api/progress/company/{id}/weekly       → métricas semanales del equipo
+GET /api/progress/me                            → progreso del usuario actual
+GET /api/progress/mission                       → misión diaria (3 lecciones/día)
+GET /api/progress/company/{id}                  → progreso de la empresa
+GET /api/progress/company/{id}/weekly           → métricas semanales del equipo
+GET /api/progress/company/{id}/certificates     → estado de certificados por operario
 """
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import and_, func, select
+from sqlalchemy.orm import selectinload
 
 from app.core.deps import DB, CurrentUser, ManagerUser
 from app.models.models import (
-    DailyStreak, LearningPath, Module, Lesson, OnboardingResult,
-    User, UserLessonProgress, UserPathProgress, ProgressStatus, UserRole,
+    Badge, DailyStreak, LearningPath, Module, Lesson, OnboardingResult,
+    User, UserBadge, UserLessonProgress, UserPathProgress, ProgressStatus, UserRole,
 )
 
 router = APIRouter()
@@ -275,3 +277,107 @@ async def get_company_weekly(company_id: UUID, db: DB, user: ManagerUser):
         "weekly_target": WEEKLY_LESSON_TARGET,
         "team": sorted(team, key=lambda x: x["lessons_this_week"], reverse=True),
     }
+
+
+CERTIFICATION_BADGE_NAME = "Operario Habilitado"
+
+
+@router.get("/company/{company_id}/certificates")
+async def get_company_certificates(company_id: UUID, db: DB, user: ManagerUser):
+    """Certificate status for each learner. Requires manager role."""
+
+    if user.company_id != company_id and user.role.value != "superadmin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tenés acceso a esta empresa")
+
+    # All active learners in this company
+    users_result = await db.execute(
+        select(User).where(
+            User.company_id == company_id,
+            User.is_active.is_(True),
+            User.role == UserRole.learner,
+        )
+    )
+    users = users_result.scalars().all()
+
+    if not users:
+        return {"company_id": str(company_id), "certificates": []}
+
+    user_ids = [u.id for u in users]
+
+    # Fetch the certification badge
+    badge_result = await db.execute(
+        select(Badge).where(Badge.name == CERTIFICATION_BADGE_NAME)
+    )
+    cert_badge = badge_result.scalar_one_or_none()
+
+    # Map user_id → UserBadge for users who earned the cert badge
+    earned_map: dict = {}
+    if cert_badge:
+        earned_result = await db.execute(
+            select(UserBadge).where(
+                UserBadge.user_id.in_(user_ids),
+                UserBadge.badge_id == cert_badge.id,
+            )
+        )
+        for ub in earned_result.scalars().all():
+            earned_map[ub.user_id] = ub
+
+    certificates = []
+    for u in users:
+        ub = earned_map.get(u.id)
+        cert = None
+
+        if ub:
+            # Most recent assigned path for module breakdown
+            pp_result = await db.execute(
+                select(UserPathProgress)
+                .where(UserPathProgress.user_id == u.id)
+                .order_by(UserPathProgress.started_at.desc())
+                .limit(1)
+            )
+            path_progress = pp_result.scalar_one_or_none()
+
+            modules_data = []
+            if path_progress:
+                mods_result = await db.execute(
+                    select(Module)
+                    .where(Module.path_id == path_progress.path_id, Module.is_published.is_(True))
+                    .options(selectinload(Module.lessons))
+                    .order_by(Module.order_index)
+                )
+                modules = mods_result.scalars().all()
+
+                # Completed lesson IDs for this user
+                comp_result = await db.execute(
+                    select(UserLessonProgress.lesson_id).where(
+                        UserLessonProgress.user_id == u.id,
+                        UserLessonProgress.status == ProgressStatus.completed,
+                    )
+                )
+                completed_ids = set(comp_result.scalars().all())
+
+                for mod in modules:
+                    published = [l for l in mod.lessons if l.is_published]
+                    done = [l for l in published if l.id in completed_ids]
+                    modules_data.append({
+                        "title": mod.title,
+                        "lessons_done": len(done),
+                        "total_lessons": len(published),
+                        "completed": len(published) > 0 and len(done) == len(published),
+                    })
+
+            cert = {
+                "badge_name": cert_badge.name if cert_badge else CERTIFICATION_BADGE_NAME,
+                "earned_at": ub.earned_at.isoformat(),
+                "modules": modules_data,
+                "total_xp": u.total_xp,
+            }
+
+        certificates.append({
+            "user_id": str(u.id),
+            "full_name": u.full_name,
+            "email": u.email,
+            "certificate": cert,
+        })
+
+    return {"company_id": str(company_id), "certificates": certificates}
