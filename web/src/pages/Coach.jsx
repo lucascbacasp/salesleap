@@ -3,13 +3,76 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 
+// ── Configuración de UI por industry (espejea INDUSTRY_COACH_CONFIG del backend) ──
+const COACH_UI_CONFIG = {
+  onboarding_alimentaria: {
+    title: 'Coach de Inocuidad Alimentaria',
+    welcome: (name) =>
+      `¡Hola ${name}! 👋 Soy tu Coach de Inocuidad Alimentaria. Podés preguntarme sobre BPM, CCPs, HACCP, trazabilidad, alérgenos o cualquier tema de tu capacitación. ¿En qué te puedo ayudar?`,
+    prompts: [
+      '¿Qué es un Punto Crítico de Control (CCP)?',
+      '¿Cuáles son las BPM que debo cumplir en planta?',
+      'Explicame el sistema HACCP',
+      '¿Cómo gestiono alérgenos en la línea de producción?',
+    ],
+  },
+  alimentaria: {
+    title: 'Coach de Inocuidad Alimentaria',
+    welcome: (name) =>
+      `¡Hola ${name}! 👋 Soy tu Coach de Inocuidad Alimentaria. Podés preguntarme sobre BPM, CCPs, HACCP, trazabilidad, alérgenos o cualquier tema de tu capacitación. ¿En qué te puedo ayudar?`,
+    prompts: [
+      '¿Qué es un Punto Crítico de Control (CCP)?',
+      '¿Cuáles son las BPM que debo cumplir en planta?',
+      'Explicame el sistema HACCP',
+      '¿Cómo gestiono alérgenos en la línea de producción?',
+    ],
+  },
+  auto: {
+    title: 'Coach de Ventas Automotrices',
+    welcome: (name) =>
+      `¡Hola ${name}! 👋 Soy tu Coach de Ventas Automotrices. Podés preguntarme sobre venta consultiva, manejo de objeciones, cierre, posventa o practicar un roleplay. ¿En qué te puedo ayudar?`,
+    prompts: [
+      '¿Cómo manejo la objeción "es muy caro"?',
+      'Dame tips para cerrar una venta hoy',
+      'Quiero practicar un roleplay de venta de autos',
+      '¿Cómo hago un buen seguimiento de leads automotriz?',
+    ],
+  },
+  inmobiliaria: {
+    title: 'Coach de Ventas Inmobiliarias',
+    welcome: (name) =>
+      `¡Hola ${name}! 👋 Soy tu Coach de Ventas Inmobiliarias. Podés preguntarme sobre captación, tasación, negociación, cierre de escrituras o practicar un roleplay. ¿En qué te puedo ayudar?`,
+    prompts: [
+      '¿Cómo capto propiedades en exclusiva?',
+      'Dame tips para cerrar una escritura',
+      '¿Cómo argumento el precio de tasación?',
+      '¿Cómo manejo la objeción del precio de una propiedad?',
+    ],
+  },
+  _default: {
+    title: 'SalesLeap Coach',
+    welcome: (name) =>
+      `¡Hola ${name}! 👋 Soy tu SalesLeap Coach. Podés preguntarme sobre ventas, técnicas de cierre, manejo de objeciones, o practicar un roleplay. ¿En qué te puedo ayudar?`,
+    prompts: [
+      '¿Cómo manejo la objeción "es muy caro"?',
+      'Dame tips para cerrar una venta hoy',
+      'Quiero practicar un roleplay de ventas',
+      '¿Cómo hago un buen seguimiento de leads?',
+    ],
+  },
+};
+
 export default function Coach() {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const firstName = user?.full_name?.split(' ')[0] || '';
+  const config = COACH_UI_CONFIG[user?.industry] || COACH_UI_CONFIG._default;
+
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: `¡Hola ${user?.full_name?.split(' ')[0] || ''}! 👋 Soy tu AI Sales Coach. Podés preguntarme cualquier cosa sobre ventas: técnicas de cierre, manejo de objeciones, cómo mejorar tu pitch, o practicar un roleplay. ¿En qué te puedo ayudar?`,
+      content: config.welcome(firstName),
     },
   ]);
   const [input, setInput] = useState('');
@@ -71,12 +134,7 @@ export default function Coach() {
     }
   };
 
-  const quickPrompts = [
-    '¿Cómo manejo la objeción "es muy caro"?',
-    'Dame tips para cerrar una venta hoy',
-    'Quiero practicar un roleplay de ventas',
-    '¿Cómo hago un buen seguimiento de leads?',
-  ];
+  const quickPrompts = config.prompts;
 
   return (
     <div className="min-h-screen flex flex-col max-w-3xl mx-auto">
@@ -90,7 +148,7 @@ export default function Coach() {
             🧠
           </div>
           <div>
-            <h1 className="font-semibold text-white">AI Sales Coach</h1>
+            <h1 className="font-semibold text-white">{config.title}</h1>
             <p className="text-xs text-green-400">En línea</p>
           </div>
         </div>
