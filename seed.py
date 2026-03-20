@@ -1140,6 +1140,382 @@ INDUSTRIA_USERS = [
 ]
 
 # ============================================================
+# SERVAGROP DEMO — agro.app
+# ============================================================
+SERVAGROP_COMPANY = {
+    "id": uuid.UUID("a0000000-0000-0000-0000-000000000005"),
+    "name": "Servagrop",
+    "slug": "servagrop",
+    "email_domain": "agro.app",
+    "industry": "alimentaria",
+    "plan": "pro",
+    "is_active": True,
+    "settings": {},
+}
+
+SERVAGROP_PATH = {
+    "id": uuid.UUID("b0000000-0000-0000-0000-000000000004"),
+    "title": "Operario Habilitado — Inocuidad Alimentaria",
+    "description": "Capacitación obligatoria para operarios de planta bajo estándar BRCGS. Dominá los riesgos del maní, las BPM, los tres puntos críticos de control y la trazabilidad completa del proceso.",
+    "industry": "onboarding_alimentaria",
+    "level": "beginner",
+    "company_id": uuid.UUID("a0000000-0000-0000-0000-000000000005"),
+    "xp_reward": 300,
+    "order_index": 4,
+    "is_published": True,
+}
+
+SERVAGROP_MODULES = [
+    # ── Módulo 1: Guardián de la inocuidad (días 1–2) ─────────
+    {
+        "id": uuid.UUID("c0000000-0000-0000-0000-000000000010"),
+        "path_id": uuid.UUID("b0000000-0000-0000-0000-000000000004"),
+        "title": "Guardián de la inocuidad",
+        "description": "Días 1–2: Conocé los riesgos del maní y las Buenas Prácticas de Manufactura que rigen en la planta.",
+        "order_index": 0,
+        "xp_reward": 70,
+        "estimated_minutes": 60,
+        "is_published": True,
+        "lessons": [
+            {
+                "title": "El maní y sus riesgos",
+                "lesson_type": "theory",
+                "order_index": 0,
+                "xp_reward": 30,
+                "estimated_minutes": 10,
+                "content": {
+                    "text": "Servagrop opera bajo el estándar BRCGS (British Retail Consortium Global Standard), uno de los marcos de inocuidad alimentaria más exigentes del mundo. Como operario de planta, conocer los riesgos asociados al maní no es opcional: es tu responsabilidad y la de tus compañeros.\n\nEl maní es el alérgeno #1 en nuestra línea de producción. Una traza mínima puede desencadenar reacciones severas en personas alérgicas. Eso significa que tu trabajo impacta directamente en la salud de consumidores reales.",
+                    "key_points": [
+                        "🏛️ BRCGS exige control total de alérgenos, trazabilidad completa y BPM rigurosas en cada turno",
+                        "🥜 El maní es el alérgeno de mayor riesgo en planta — contaminación cruzada entre líneas es la causa #1 de recalls internacionales",
+                        "🦠 Peligro biológico: bacterias como Salmonella y hongos productores de aflatoxinas pueden contaminar el maní en cualquier etapa del proceso",
+                        "⚗️ Peligro químico: residuos de plaguicidas, lubricantes de maquinaria y productos de limpieza mal enjuagados",
+                        "🔩 Peligro físico: fragmentos de cáscaras, piedras, metal o plástico que ingresan con la materia prima o por desgaste de equipos",
+                        "⚠️ Alérgenos cruzados: el contacto entre líneas de maní y otras líneas con nueces, soja o gluten debe controlarse con limpieza validada y separación física",
+                    ],
+                    "summary": "En Servagrop, los 5 peligros principales son biológico, químico, físico, alérgenos cruzados y cuerpos extraños. El maní como alérgeno requiere control riguroso en cada etapa. BRCGS establece el estándar que todos debemos cumplir.",
+                },
+            },
+            {
+                "title": "BPM: las reglas de la planta",
+                "lesson_type": "quiz",
+                "order_index": 1,
+                "xp_reward": 40,
+                "estimated_minutes": 10,
+                "content": {
+                    "text": "Las Buenas Prácticas de Manufactura (BPM) son la base de la inocuidad en Servagrop. Cada regla existe para proteger al consumidor, a vos y a la empresa. Demostrá que las conocés. Necesitás 5 de 6 para aprobar.",
+                    "passing_score": 5,
+                    "badge": "Guardián de la inocuidad",
+                    "questions": [
+                        {
+                            "question": "¿Cuál es el EPP obligatorio para ingresar a la línea de producción de maní?",
+                            "options": [
+                                "Ambo de trabajo solamente",
+                                "Cofia, barbijo, guantes de nitrilo, ambo y calzado cerrado sin ojales",
+                                "Guantes y cofia únicamente",
+                                "Ambo, guantes y protector auditivo",
+                            ],
+                            "correct": 1,
+                            "explanation": "El EPP completo incluye cofia (cubre todo el cabello), barbijo, guantes de nitrilo (impermeables, sin polvo), ambo limpio y calzado sin ojales. Cada elemento protege contra un tipo de contaminación específica.",
+                        },
+                        {
+                            "question": "¿Qué está prohibido ingresar al área de producción?",
+                            "options": [
+                                "Botellas de agua con tapa",
+                                "Joyas, alimentos, bebidas, teléfonos celulares y medicamentos sin declarar",
+                                "Cuadernos de apuntes",
+                                "Fichas de control de turno",
+                            ],
+                            "correct": 1,
+                            "explanation": "Joyas, alimentos y teléfonos son fuentes de contaminación física, biológica y química. Los medicamentos deben declararse en la planilla de salud antes de ingresar.",
+                        },
+                        {
+                            "question": "El protocolo correcto de higiene de manos antes de ingresar a la línea es:",
+                            "options": [
+                                "Lavado con agua y secado con toalla de tela",
+                                "Alcohol en gel únicamente",
+                                "Lavado con jabón antibacterial por 20 segundos, enjuague, secado con papel desechable y aplicación de alcohol en gel",
+                                "Solo si las manos están visiblemente sucias",
+                            ],
+                            "correct": 2,
+                            "explanation": "El protocolo completo: lavado con jabón antibacterial 20 seg → enjuague → secado con papel descartable (nunca toalla de tela) → alcohol en gel. Este proceso elimina el 99.9% de microorganismos.",
+                        },
+                        {
+                            "question": "¿Cómo debe manejarse la ropa de trabajo?",
+                            "options": [
+                                "Podés entrar con ropa de calle si está limpia",
+                                "El ambo solo se cambia los lunes y jueves",
+                                "El ambo se pone en el vestuario, nunca sale a la calle y se entrega para lavado según el cronograma establecido",
+                                "Si se ensucia levemente, podés seguir usándolo hasta el fin del turno",
+                            ],
+                            "correct": 2,
+                            "explanation": "Sacar el ambo a la calle lo contamina con agentes externos que luego ingresan a la planta. La lavandería de planta garantiza temperatura y proceso controlado. La entrega debe registrarse.",
+                        },
+                        {
+                            "question": "Durante tu turno, se derrama un producto químico de limpieza cerca de la línea. ¿Qué hacés primero?",
+                            "options": [
+                                "Limpiar rápido con lo que tenés a mano para no parar la producción",
+                                "Ignorarlo si el derrame es pequeño",
+                                "Detener la operación en el área afectada, señalizar la zona, notificar al supervisor y usar el kit de derrame según el procedimiento",
+                                "Avisarle a un compañero para que lo limpie mientras vos seguís trabajando",
+                            ],
+                            "correct": 2,
+                            "explanation": "Un derrame químico es un evento de inocuidad. Primero protegé al personal y al producto (detener y señalizar), luego notificá al supervisor y actuá con el kit de derrame. Ignorar puede contaminar el producto.",
+                        },
+                        {
+                            "question": "¿Qué debés documentar al final de cada turno?",
+                            "options": [
+                                "Solo si hubo algún problema",
+                                "La cantidad de cajas producidas únicamente",
+                                "El registro de temperatura de equipos, cualquier no conformidad detectada, limpieza realizada y firma del responsable de turno",
+                                "No es obligatorio documentar si el turno fue normal",
+                            ],
+                            "correct": 2,
+                            "explanation": "BRCGS exige trazabilidad completa. La documentación incluye registros de CCPs, no conformidades (incluso menores), limpieza y sanitización. Un turno sin registro es una no conformidad grave en auditoría.",
+                        },
+                    ],
+                },
+            },
+        ],
+    },
+    # ── Módulo 2: Operador de puntos críticos (días 3–5) ──────
+    {
+        "id": uuid.UUID("c0000000-0000-0000-0000-000000000011"),
+        "path_id": uuid.UUID("b0000000-0000-0000-0000-000000000004"),
+        "title": "Operador de puntos críticos",
+        "description": "Días 3–5: Entendé cómo funcionan los tres CCPs de la línea y cómo responder ante una anomalía.",
+        "order_index": 1,
+        "xp_reward": 110,
+        "estimated_minutes": 90,
+        "is_published": True,
+        "lessons": [
+            {
+                "title": "SORTEX, metales y rayos X",
+                "lesson_type": "theory",
+                "order_index": 0,
+                "xp_reward": 50,
+                "estimated_minutes": 12,
+                "content": {
+                    "text": "En la línea de Servagrop hay tres Puntos Críticos de Control (CCP) que operan en conjunto para garantizar que ningún peligro físico o biológico llegue al producto terminado. Como operario, tenés que entender qué hace cada equipo, cómo se verifica al inicio del turno y qué hacer cuando detecta una anomalía.",
+                    "key_points": [
+                        "🔬 SORTEX (selector óptico): Detecta maní con manchas de aflatoxina, decoloración por hongos y material extraño usando cámaras de alta resolución e infrarrojos. Rechazo automático por chorro de aire comprimido.",
+                        "🔩 Detector de metales: Identifica partículas metálicas ferrosas, no ferrosas y de acero inoxidable de 1.5 mm o más. Requiere calibración con test pieces al inicio de cada turno (ferroso, no ferroso y acero inox).",
+                        "☢️ Equipo de rayos X: Detecta cuerpos extraños densos (vidrio, hueso, piedra, metal de alta densidad) que el detector de metales no puede ver. Sensibilidad: 3 mm para vidrio y hueso.",
+                        "✅ Verificación al inicio de turno: los 3 CCPs deben verificarse con muestras patrón antes de iniciar producción. El registro debe firmarse. Sin verificación aprobada = no se inicia la línea.",
+                        "🚨 Ante anomalía: alarma visual y sonora → detener línea → aislar el lote → registrar en formulario de no conformidad → notificar supervisor de calidad → no liberar hasta inspección.",
+                    ],
+                    "summary": "Los 3 CCPs (SORTEX, detector de metales y rayos X) trabajan en cascada para eliminar peligros físicos y biológicos. La verificación al inicio de turno es obligatoria y su registro es auditado por BRCGS.",
+                },
+            },
+            {
+                "title": "Simulación de CCP en línea",
+                "lesson_type": "roleplay",
+                "order_index": 1,
+                "xp_reward": 60,
+                "estimated_minutes": 15,
+                "content": {
+                    "scenario": "Son las 14:45 del turno tarde. Llevás 3 horas de producción continua. De repente, el detector de metales emite una alarma sonora y visual. La línea se detiene automáticamente. No hay supervisor en el área — está en reunión en la oficina de calidad.\n\nEl lote en proceso es LP-2024-089, 500 kg de maní tostado destino exportación. Hay presión para retomar la producción porque el camión de despacho llega a las 17:00.\n\nDescribí los 5 pasos del protocolo que ejecutarías en este momento, en orden exacto.",
+                    "objective": "Demostrar que conocés y ejecutarías correctamente el protocolo de respuesta ante alarma de CCP bajo presión de tiempo y sin supervisor presente.",
+                    "evaluation_criteria": [
+                        "Paso 1 — Detener la línea completamente y no reiniciar sin autorización, sin importar la presión de producción",
+                        "Paso 2 — Aislar el lote afectado (LP-2024-089) físicamente y señalizar la zona como 'EN CUARENTENA'",
+                        "Paso 3 — Registrar el evento en el formulario de No Conformidad: hora exacta, equipo que alarmó, descripción de la alarma y número de lote",
+                        "Paso 4 — Notificar al supervisor de calidad de forma inmediata aunque esté en reunión — este evento justifica la interrupción",
+                        "Paso 5 — No liberar el lote ni reiniciar producción hasta recibir autorización escrita del responsable de calidad",
+                    ],
+                },
+            },
+        ],
+    },
+    # ── Módulo 3: Operario habilitado (días 6–7) ──────────────
+    {
+        "id": uuid.UUID("c0000000-0000-0000-0000-000000000012"),
+        "path_id": uuid.UUID("b0000000-0000-0000-0000-000000000004"),
+        "title": "Operario habilitado",
+        "description": "Días 6–7: Trazabilidad completa y simulacro de auditoría BRCGS. Certificación final.",
+        "order_index": 2,
+        "xp_reward": 120,
+        "estimated_minutes": 60,
+        "is_published": True,
+        "lessons": [
+            {
+                "title": "Del campo al despacho",
+                "lesson_type": "challenge",
+                "order_index": 0,
+                "xp_reward": 50,
+                "estimated_minutes": 12,
+                "content": {
+                    "text": "La trazabilidad es la capacidad de reconstruir el recorrido completo de un lote: desde que la materia prima ingresa a planta hasta que el producto terminado sale por la puerta de despacho. Cada CCP aprobado debe estar registrado. Si no está documentado, no existió.",
+                    "questions": [
+                        {
+                            "question": "El lote LP-2024-089 se recibió el lunes. El miércoles detectaron contaminación en materia prima del mismo proveedor. ¿Qué debe poder responder el sistema de trazabilidad?",
+                            "options": [
+                                "Solo dónde está el lote actualmente en planta",
+                                "En qué línea se procesó, qué CCPs aprobó, a qué producto terminado fue y si ya se despachó",
+                                "La cantidad de kilos del lote",
+                                "El nombre del operario que recibió el lote",
+                            ],
+                            "correct": 1,
+                            "explanation": "La trazabilidad completa (forward + backward) debe responder: de dónde viene (proveedor, fecha), cómo se procesó (línea, operarios, CCPs aprobados), a qué producto fue y a quién se vendió. Esto permite un retiro de mercado en horas.",
+                        },
+                        {
+                            "question": "¿Cuál es el primer CCP que debe superar el maní al ingresar a la línea?",
+                            "options": [
+                                "Detector de metales",
+                                "Rayos X",
+                                "SORTEX — selector óptico que detecta aflatoxina y material extraño",
+                                "Control de humedad de materia prima",
+                            ],
+                            "correct": 2,
+                            "explanation": "El SORTEX es el primer CCP: detecta maní con signos de aflatoxina (manchas) y material extraño antes del procesamiento. Si pasa material contaminado en esta etapa, los CCPs siguientes no detectarán el peligro biológico.",
+                        },
+                        {
+                            "question": "Un operario verifica el detector de metales al inicio de turno pero no firma el registro. ¿Cuál es el problema?",
+                            "options": [
+                                "Ninguno — lo importante es que lo verificó",
+                                "Solo si el auditor lo pide explícitamente",
+                                "Sin firma, el registro no existe para BRCGS — es como si el CCP no se hubiera verificado",
+                                "Puede completar la firma al final del turno",
+                            ],
+                            "correct": 2,
+                            "explanation": "BRCGS auditará los registros físicos. Una verificación sin firma es una no conformidad. La firma no es burocracia: es la evidencia de que una persona responsable realizó y validó la verificación en ese momento.",
+                        },
+                        {
+                            "question": "¿Qué información debe incluir el rótulo de un lote en cuarentena?",
+                            "options": [
+                                "Solo 'CUARENTENA' escrito con marcador",
+                                "Número de lote, fecha, motivo de cuarentena y firma del responsable que lo separó",
+                                "Nombre del operario que detectó el problema",
+                                "Solo el número de lote y la fecha",
+                            ],
+                            "correct": 1,
+                            "explanation": "Un rótulo de cuarentena debe incluir: número de lote (identificación), fecha (cuándo), motivo (por qué) y firma (quién tomó la decisión). Sin esta información, el lote no puede ser liberado ni destruido con respaldo documental.",
+                        },
+                    ],
+                },
+            },
+            {
+                "title": "Simulacro de auditoría BRCGS",
+                "lesson_type": "quiz",
+                "order_index": 1,
+                "xp_reward": 70,
+                "estimated_minutes": 15,
+                "content": {
+                    "text": "Un auditor externo de BRCGS entra a la planta sin aviso previo. Te hace preguntas directamente a vos como operario. Necesitás responder correctamente 7 de 8 para obtener la certificación de Operario Habilitado.",
+                    "passing_score": 7,
+                    "badge": "Operario Habilitado",
+                    "questions": [
+                        {
+                            "question": "El auditor te pregunta: '¿Qué hacés si encontrás un cuerpo extraño en la línea?' ¿Cuál es la respuesta correcta?",
+                            "options": [
+                                "Lo retiro y sigo produciendo si es pequeño",
+                                "Detengo la línea, aíslo el lote, registro el evento y notifico al supervisor de calidad",
+                                "Lo guardo para mostrárselo al supervisor al final del turno",
+                                "Aviso a un compañero para que decida qué hacer",
+                            ],
+                            "correct": 1,
+                            "explanation": "Ante cualquier cuerpo extraño: detener → aislar → registrar → notificar. El auditor busca que el operario tenga este protocolo automatizado. Una respuesta incorrecta indica falta de capacitación — no conformidad potencial.",
+                        },
+                        {
+                            "question": "El auditor pregunta: '¿Con qué frecuencia se verifica el detector de metales?' ¿Qué respondés?",
+                            "options": [
+                                "Una vez por semana",
+                                "Cuando creemos que puede estar fallando",
+                                "Al inicio de cada turno, con las tres test pieces certificadas, y el resultado se registra y firma",
+                                "Al inicio de cada día sin importar cuántos turnos hay",
+                            ],
+                            "correct": 2,
+                            "explanation": "La verificación es por turno, no por día. Dos turnos = dos verificaciones. Cada verificación requiere las tres test pieces (ferrosa, no ferrosa, acero inox) y registro firmado.",
+                        },
+                        {
+                            "question": "El auditor te señala tu ambo y pregunta cuándo fue lavado. ¿Qué respuesta demuestra buenas prácticas?",
+                            "options": [
+                                "No lo sé exactamente",
+                                "Lo lavé yo en casa anoche",
+                                "Se entregó al servicio de lavandería de planta según el cronograma y tengo el registro de entrega",
+                                "Solo cuando está visiblemente sucio",
+                            ],
+                            "correct": 2,
+                            "explanation": "El ambo no se lava en casa — contamina con el entorno doméstico. La lavandería de planta garantiza proceso controlado y temperatura adecuada. La entrega debe registrarse para trazabilidad.",
+                        },
+                        {
+                            "question": "¿Cuál es la diferencia entre una no conformidad menor y una mayor en BRCGS?",
+                            "options": [
+                                "El tamaño físico del problema",
+                                "Menor: el sistema funciona con debilidades puntuales. Mayor: falla sistemática que compromete la inocuidad del producto",
+                                "Menor: la detectó el operario. Mayor: la detectó el auditor externo",
+                                "No hay diferencia práctica entre ellas",
+                            ],
+                            "correct": 1,
+                            "explanation": "NC menor: debilidad aislada (ej: registro sin firma puntual). NC mayor: falla del sistema (ej: CCP no verificado sistemáticamente). Acumular NC menores puede derivar en mayor en la próxima auditoría.",
+                        },
+                        {
+                            "question": "¿Qué pasa si el maní entra en contacto con una línea que procesa soja?",
+                            "options": [
+                                "Se lava la línea con agua y se reinicia",
+                                "Es un incidente de alérgenos cruzados que requiere protocolo de limpieza validado, test de alérgenos y resultado negativo documentado antes de reiniciar — puede requerir retiro de mercado",
+                                "No es un problema si la cantidad de contacto fue pequeña",
+                                "Hay que tirar solo el lote directamente afectado",
+                            ],
+                            "correct": 1,
+                            "explanation": "Contaminación cruzada de alérgenos es uno de los riesgos más graves. El protocolo: limpieza con método validado + muestreo para test de alérgenos + resultado negativo documentado. Si el producto ya salió puede requerir retiro de mercado.",
+                        },
+                        {
+                            "question": "¿Qué es HACCP y por qué es relevante para tu trabajo?",
+                            "options": [
+                                "Un formulario de control de temperatura",
+                                "El nombre del auditor certificador de BRCGS",
+                                "Hazard Analysis and Critical Control Points — el sistema que identifica peligros en la línea y define los CCPs donde se controlan",
+                                "Un tipo de equipo de detección de metales de última generación",
+                            ],
+                            "correct": 2,
+                            "explanation": "HACCP sustenta todo el control de inocuidad. Los CCPs que verificás diariamente existen porque el plan HACCP los identificó como puntos donde el peligro puede ser prevenido o eliminado. Entender el por qué te hace más competente.",
+                        },
+                        {
+                            "question": "El auditor pregunta si hubo algo inusual en los últimos días. Recordás que el detector de metales dio una alarma pero el supervisor dijo 'no pasa nada' sin documentar. ¿Qué hacés?",
+                            "options": [
+                                "Decís que no hubo nada inusual para no complicar al supervisor",
+                                "Contás el evento al auditor tal como lo recordás, con fecha y detalle",
+                                "Evitás el tema para no meter en problemas al equipo",
+                                "Decís que no lo recordás con claridad",
+                            ],
+                            "correct": 1,
+                            "explanation": "La transparencia con el auditor es una obligación. Un evento sin registrar es en sí una no conformidad que debe salir a la luz para ser corregida. Ocultar compromete la integridad del sistema.",
+                        },
+                        {
+                            "question": "Como operario habilitado, ¿cuál es tu responsabilidad principal?",
+                            "options": [
+                                "Solo cumplir con lo que te pidan en el turno",
+                                "Cuidar la inocuidad del producto, respetar los procedimientos, reportar cualquier desviación y ayudar a que los nuevos compañeros entiendan las reglas",
+                                "Asegurarte de que la producción nunca se detenga",
+                                "Firmar los registros rápido para agilizar el proceso",
+                            ],
+                            "correct": 1,
+                            "explanation": "Un operario habilitado no solo cumple: es el primer eslabón de la cadena de inocuidad. Tu capacidad de detectar desviaciones, reportarlas y transmitir la cultura de calidad es lo que sostiene la certificación BRCGS.",
+                        },
+                    ],
+                },
+            },
+        ],
+    },
+]
+
+SERVAGROP_USERS = [
+    {
+        "email": "javier@agro.app",
+        "full_name": "Javier",
+        "role": "learner",
+        "onboarding_done": False,
+    },
+    {
+        "email": "admin@agro.app",
+        "full_name": "Admin Servagrop",
+        "role": "manager",
+        "onboarding_done": True,
+    },
+]
+
+# ============================================================
 # AUTO DEMO — auto.app
 # ============================================================
 AUTO_APP_COMPANY = {
@@ -1215,6 +1591,102 @@ AUTO_APP_SALESPEOPLE = [
         "badge_names": ["Primer Paso"],
     },
 ]
+
+
+async def seed_agro():
+    """Idempotent seed for Servagrop (agro.app). Safe to run multiple times."""
+    import copy as _copy
+    print("🌱 Seeding Servagrop (agro.app)...")
+
+    async with async_session() as db:
+        # ── Company ──────────────────────────────────────────────
+        co = (await db.execute(text("SELECT 1 FROM companies WHERE email_domain = 'agro.app'"))).scalar_one_or_none()
+        if not co:
+            db.add(Company(**SERVAGROP_COMPANY))
+            await db.flush()
+            print("  ✅ Empresa Servagrop creada")
+        else:
+            print("  ℹ️  Empresa agro.app ya existe — skipping")
+
+        # ── Learning path ─────────────────────────────────────────
+        path_exists = (await db.execute(text("SELECT 1 FROM learning_paths WHERE id = :id"), {"id": SERVAGROP_PATH["id"]})).scalar_one_or_none()
+        if not path_exists:
+            db.add(LearningPath(**SERVAGROP_PATH))
+            await db.flush()
+            print("  ✅ Path 'Operario Habilitado — Inocuidad Alimentaria' creado")
+        else:
+            print("  ℹ️  Path agro ya existe — skipping")
+
+        # ── Modules & Lessons ─────────────────────────────────────
+        mods_exist = (await db.execute(text("SELECT COUNT(*) FROM modules WHERE path_id = :pid"), {"pid": SERVAGROP_PATH["id"]})).scalar()
+        if not mods_exist:
+            total_lessons = 0
+            for mod_data in _copy.deepcopy(SERVAGROP_MODULES):
+                lessons_data = mod_data.pop("lessons")
+                module = Module(**mod_data)
+                db.add(module)
+                await db.flush()
+                for ld in lessons_data:
+                    db.add(Lesson(module_id=module.id, is_published=True, **ld))
+                    total_lessons += 1
+            print(f"  ✅ {len(SERVAGROP_MODULES)} módulos y {total_lessons} lecciones creados")
+        else:
+            print("  ℹ️  Módulos agro ya existen — skipping")
+
+        # ── Badges ───────────────────────────────────────────────
+        AGRO_BADGES = [
+            ("Guardián de la inocuidad", "Aprobaste el quiz de BPM con 5/6 o más", "🛡️", "onboarding",
+             '{"onboarding_lesson": "BPM: las reglas de la planta"}', 75, "common"),
+            ("CCP Operador", "Completaste el roleplay de respuesta ante alarma de CCP", "🔬", "onboarding",
+             '{"onboarding_lesson": "Simulación de CCP en línea"}', 100, "rare"),
+            ("Operario Habilitado", "Aprobaste el simulacro de auditoría BRCGS con 7/8 o más", "🏅", "onboarding",
+             '{"onboarding_lesson": "Simulacro de auditoría BRCGS"}', 150, "epic"),
+        ]
+        for name, desc, icon, cat, criteria_json, xp_bonus, rarity in AGRO_BADGES:
+            exists = (await db.execute(text("SELECT 1 FROM badges WHERE name = :n"), {"n": name})).scalar_one_or_none()
+            if not exists:
+                await db.execute(
+                    text("INSERT INTO badges (name, description, icon, category, criteria, xp_bonus, rarity) VALUES (:name, :desc, :icon, :cat, CAST(:criteria AS jsonb), :xp, :rarity)"),
+                    {"name": name, "desc": desc, "icon": icon, "cat": cat, "criteria": criteria_json, "xp": xp_bonus, "rarity": rarity},
+                )
+                print(f"  ✅ Badge '{name}' creado")
+            else:
+                print(f"  ℹ️  Badge '{name}' ya existe — skipping")
+
+        # ── Users ─────────────────────────────────────────────────
+        from datetime import datetime, timezone
+        for u_data in SERVAGROP_USERS:
+            exists = (await db.execute(text("SELECT 1 FROM users WHERE email = :e"), {"e": u_data["email"]})).scalar_one_or_none()
+            if not exists:
+                user = User(
+                    email=u_data["email"],
+                    full_name=u_data["full_name"],
+                    role=UserRole(u_data["role"]),
+                    company_id=SERVAGROP_COMPANY["id"],
+                    industry="alimentaria",
+                    experience_level="beginner",
+                    email_verified=True,
+                    onboarding_done=u_data["onboarding_done"],
+                    is_active=True,
+                )
+                db.add(user)
+                await db.flush()
+                if u_data["role"] == "learner":
+                    db.add(UserPathProgress(
+                        user_id=user.id,
+                        path_id=SERVAGROP_PATH["id"],
+                        status=ProgressStatus.in_progress,
+                        started_at=datetime.now(timezone.utc),
+                    ))
+                print(f"  ✅ Usuario {u_data['email']} creado ({u_data['role']})")
+            else:
+                print(f"  ℹ️  Usuario {u_data['email']} ya existe — skipping")
+
+        await db.commit()
+        print("🎉 Servagrop seed completado.")
+        print("   Usuarios: javier@agro.app (learner) | admin@agro.app (manager)")
+        print("   Path: 'Operario Habilitado — Inocuidad Alimentaria' (3 módulos, 6 lecciones)")
+        print("   Badges: Guardián de la inocuidad | CCP Operador | Operario Habilitado")
 
 
 async def seed():
@@ -1338,5 +1810,14 @@ async def seed():
         print("   Onboarding: 'De cero a operador en 7 días' (3 niveles, 6 lecciones)")
 
 
+async def main():
+    # seed() is for full initial setup from scratch (interactive).
+    # seed_agro() is idempotent and always safe to run.
+    import sys
+    if "--full" in sys.argv:
+        await seed()
+    await seed_agro()
+
+
 if __name__ == "__main__":
-    asyncio.run(seed())
+    asyncio.run(main())

@@ -13,7 +13,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from app.core.config import settings
 from app.core.database import async_session, engine, init_db
@@ -449,6 +449,82 @@ async def _auto_seed():
             logger.info("startup: seed-industria (industria.app) applied")
     except Exception as e:
         logger.error(f"startup: seed-industria error — {e}")
+
+    # ── 6. seed-agro (agro.app / Servagrop) ────────────────────
+    try:
+        from seed import SERVAGROP_COMPANY, SERVAGROP_PATH, SERVAGROP_MODULES, SERVAGROP_USERS
+        from app.models.models import (
+            Company, LearningPath, User, UserRole, UserPathProgress,
+            Module as _ModA, Lesson as _LesA, ProgressStatus,
+        )
+        import uuid as _uuid_agro
+
+        async with async_session() as db:
+            if not (await db.execute(select(Company).where(Company.email_domain == "agro.app"))).scalar_one_or_none():
+                db.add(Company(**SERVAGROP_COMPANY))
+                await db.flush()
+
+            if not (await db.execute(select(LearningPath).where(LearningPath.id == SERVAGROP_PATH["id"]))).scalar_one_or_none():
+                db.add(LearningPath(**SERVAGROP_PATH))
+                await db.flush()
+
+            mods_count = (await db.execute(
+                select(func.count()).where(_ModA.path_id == SERVAGROP_PATH["id"])
+            )).scalar()
+            if not mods_count:
+                for mod_data in _copy.deepcopy(SERVAGROP_MODULES):
+                    lessons_data = mod_data.pop("lessons")
+                    mod = _ModA(**mod_data)
+                    db.add(mod)
+                    await db.flush()
+                    for ld in lessons_data:
+                        db.add(_LesA(module_id=mod.id, is_published=True, **ld))
+
+            AGRO_BADGES = [
+                ("Guardián de la inocuidad", "Aprobaste el quiz de BPM con 5/6 o más", "🛡️", "onboarding",
+                 '{"onboarding_lesson": "BPM: las reglas de la planta"}', 75, "common"),
+                ("CCP Operador", "Completaste el roleplay de respuesta ante alarma de CCP", "🔬", "onboarding",
+                 '{"onboarding_lesson": "Simulación de CCP en línea"}', 100, "rare"),
+                ("Operario Habilitado", "Aprobaste el simulacro de auditoría BRCGS con 7/8 o más", "🏅", "onboarding",
+                 '{"onboarding_lesson": "Simulacro de auditoría BRCGS"}', 150, "epic"),
+            ]
+            for name, desc, icon, cat, criteria_json, xp_bonus, rarity in AGRO_BADGES:
+                if not (await db.execute(text("SELECT 1 FROM badges WHERE name = :n"), {"n": name})).scalar_one_or_none():
+                    await db.execute(
+                        text("INSERT INTO badges (name, description, icon, category, criteria, xp_bonus, rarity) VALUES (:name, :desc, :icon, :cat, CAST(:criteria AS jsonb), :xp, :rarity)"),
+                        {"name": name, "desc": desc, "icon": icon, "cat": cat, "criteria": criteria_json, "xp": xp_bonus, "rarity": rarity},
+                    )
+
+            for u_data in SERVAGROP_USERS:
+                u = (await db.execute(select(User).where(User.email == u_data["email"]))).scalar_one_or_none()
+                if not u:
+                    u = User(
+                        email=u_data["email"], full_name=u_data["full_name"],
+                        role=UserRole(u_data["role"]), company_id=SERVAGROP_COMPANY["id"],
+                        industry="alimentaria", experience_level="beginner",
+                        email_verified=True, onboarding_done=u_data["onboarding_done"], is_active=True,
+                    )
+                    db.add(u)
+                    await db.flush()
+                else:
+                    u.company_id = SERVAGROP_COMPANY["id"]
+                    u.email_verified = True
+
+                if u_data["role"] == "learner":
+                    if not (await db.execute(select(UserPathProgress).where(
+                        UserPathProgress.user_id == u.id,
+                        UserPathProgress.path_id == SERVAGROP_PATH["id"],
+                    ))).scalar_one_or_none():
+                        db.add(UserPathProgress(
+                            user_id=u.id, path_id=SERVAGROP_PATH["id"],
+                            status=ProgressStatus.in_progress,
+                            started_at=datetime.now(timezone.utc),
+                        ))
+
+            await db.commit()
+            logger.info("startup: seed-agro (agro.app) applied")
+    except Exception as e:
+        logger.error(f"startup: seed-agro error — {e}")
 
 
 @asynccontextmanager
