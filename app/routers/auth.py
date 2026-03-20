@@ -45,6 +45,20 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
                     user.company_id = first_company.id
                     user.industry = first_company.industry
 
+        # Auto-associate company by email domain if not yet linked
+        if user.company_id is None and "@" in body.email:
+            domain = body.email.split("@")[1].lower()
+            domain_result = await db.execute(
+                select(Company).where(
+                    Company.email_domain == domain,
+                    Company.is_active.is_(True),
+                ).limit(1)
+            )
+            matched_company = domain_result.scalar_one_or_none()
+            if matched_company:
+                user.company_id = matched_company.id
+                user.industry = matched_company.industry
+
         # Existing non-admin user with onboarding not done → recover from pre-seeded state
         if not user.onboarding_done and body.email.lower() not in ADMIN_EMAILS:
             path_check_result = await db.execute(

@@ -44,6 +44,38 @@ async def _clean_tables():
         await conn.close()
 
 
+# Users that the auth/journey tests need pre-seeded (auth now requires existing users)
+_TEST_USERS = [
+    ("test@example.com",       "Test User",       "learner"),
+    ("returning@example.com",  "Return User",     "learner"),
+    ("journey@test.com",       "Journey User",    "learner"),
+    ("vendedor@toyota.com.ar", "Vendedor Toyota", "learner"),
+]
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _seed_test_users(_clean_tables):
+    """Pre-seed static test users so auth (403 restriction) doesn't block tests.
+
+    Depends on _clean_tables so it always runs AFTER the previous test's
+    truncate and BEFORE the current test's setup.
+    """
+    conn = await asyncpg.connect(RAW_DSN)
+    try:
+        for email, full_name, role in _TEST_USERS:
+            await conn.execute(
+                """
+                INSERT INTO users
+                    (email, full_name, role, is_active, email_verified, onboarding_done)
+                VALUES ($1, $2, $3::user_role, true, false, false)
+                ON CONFLICT (email) DO NOTHING
+                """,
+                email, full_name, role,
+            )
+    finally:
+        await conn.close()
+
+
 @pytest_asyncio.fixture
 async def db() -> AsyncGenerator[AsyncSession, None]:
     """Standalone session for direct DB assertions in tests."""
