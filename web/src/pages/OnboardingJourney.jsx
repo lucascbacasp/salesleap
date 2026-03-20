@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,7 +12,7 @@ const LESSON_TYPE_ICON = {
 
 export default function OnboardingJourney() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [mission, setMission] = useState(null);
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,8 +80,30 @@ export default function OnboardingJourney() {
     <div className="min-h-screen bg-background p-4 pb-16">
       <div className="max-w-2xl mx-auto">
 
+        {/* Navbar */}
+        <div className="flex items-center justify-between pt-4 mb-4">
+          <Link to="/dashboard" className="text-primary font-bold text-lg">
+            <span className="text-primary">Sales</span><span className="text-white">Leap</span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/coach"
+              className="text-sm bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-lg transition"
+            >
+              🧠 AI Coach
+            </Link>
+            <span className="text-gray-400 text-sm hidden md:block">{user?.email}</span>
+            <button
+              onClick={logout}
+              className="text-sm text-gray-400 hover:text-white transition"
+            >
+              Salir
+            </button>
+          </div>
+        </div>
+
         {/* Header */}
-        <div className="mb-8 pt-6">
+        <div className="mb-8 pt-2">
           <h1 className="text-2xl font-bold text-white leading-tight">
             Bienvenido, {firstName}.
           </h1>

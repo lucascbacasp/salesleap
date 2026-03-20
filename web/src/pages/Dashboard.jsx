@@ -155,19 +155,46 @@ export default function Dashboard() {
       </div>
 
       {/* Coach CTA */}
-      <Link
-        to="/coach"
-        className="block bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 rounded-xl p-5 hover:border-primary/60 transition mb-8"
-      >
-        <div className="flex items-center gap-4">
-          <div className="text-3xl">🧠</div>
-          <div>
-            <h3 className="font-semibold text-white">AI Sales Coach</h3>
-            <p className="text-sm text-gray-400">Preguntale lo que quieras sobre ventas, practicá roleplays o pedí tips personalizados</p>
-          </div>
-          <span className="text-gray-400 ml-auto">→</span>
-        </div>
-      </Link>
+      {(() => {
+        const COACH_CTA = {
+          onboarding_alimentaria: {
+            title: 'Coach de Inocuidad Alimentaria',
+            description: 'Preguntale sobre BPM, CCPs, HACCP, trazabilidad o cualquier tema de tu capacitación',
+          },
+          alimentaria: {
+            title: 'Coach de Inocuidad Alimentaria',
+            description: 'Preguntale sobre BPM, CCPs, HACCP, trazabilidad o cualquier tema de tu capacitación',
+          },
+          auto: {
+            title: 'Coach de Ventas Automotrices',
+            description: 'Preguntale sobre venta consultiva, objeciones, cierre, posventa o practicá un roleplay',
+          },
+          inmobiliaria: {
+            title: 'Coach de Ventas Inmobiliarias',
+            description: 'Preguntale sobre captación, tasación, negociación, escrituras o practicá un roleplay',
+          },
+          _default: {
+            title: 'AI Sales Coach',
+            description: 'Preguntale lo que quieras sobre ventas, practicá roleplays o pedí tips personalizados',
+          },
+        };
+        const cta = COACH_CTA[user?.industry] || COACH_CTA._default;
+        return (
+          <Link
+            to="/coach"
+            className="block bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 rounded-xl p-5 hover:border-primary/60 transition mb-8"
+          >
+            <div className="flex items-center gap-4">
+              <div className="text-3xl">🧠</div>
+              <div>
+                <h3 className="font-semibold text-white">{cta.title}</h3>
+                <p className="text-sm text-gray-400">{cta.description}</p>
+              </div>
+              <span className="text-gray-400 ml-auto">→</span>
+            </div>
+          </Link>
+        );
+      })()}
     </div>
   );
 }
