@@ -137,10 +137,6 @@ async def _auto_seed():
                     u.onboarding_done = True
 
                 if u_data["role"] == UserRole.learner and all_lessons and u_data["lessons_total"] > 0:
-                    await db.execute(text("DELETE FROM user_lesson_progress WHERE user_id = :uid"), {"uid": u.id})
-                    await db.execute(text("DELETE FROM user_path_progress WHERE user_id = :uid"), {"uid": u.id})
-                    await db.execute(text("DELETE FROM daily_streaks WHERE user_id = :uid"), {"uid": u.id})
-
                     total = min(u_data["lessons_total"], len(all_lessons))
                     this_week = u_data["lessons_this_week"]
                     older = total - this_week
@@ -154,24 +150,53 @@ async def _auto_seed():
                         else:
                             day_off = random.randint(0, min((today - monday).days, 6))
                             comp_at = datetime(monday.year, monday.month, monday.day, random.randint(8, 20), random.randint(0, 59), tzinfo=timezone.utc) + timedelta(days=day_off)
-                        db.add(UserLessonProgress(
-                            user_id=u.id, lesson_id=all_lessons[i].id,
-                            status=ProgressStatus.completed,
-                            score=random.randint(70, 100), attempts=random.randint(1, 3),
-                            time_spent_sec=random.randint(120, 600), completed_at=comp_at,
-                        ))
+                        await db.execute(text("""
+                            INSERT INTO user_lesson_progress
+                                (id, user_id, lesson_id, status, score, attempts, time_spent_sec, completed_at, created_at, updated_at)
+                            VALUES
+                                (:id, :user_id, :lesson_id, CAST(:status AS progress_status), :score, :attempts, :time_spent_sec, :completed_at, NOW(), NOW())
+                            ON CONFLICT (user_id, lesson_id) DO UPDATE SET
+                                status         = EXCLUDED.status,
+                                score          = EXCLUDED.score,
+                                attempts       = EXCLUDED.attempts,
+                                time_spent_sec = EXCLUDED.time_spent_sec,
+                                completed_at   = EXCLUDED.completed_at,
+                                updated_at     = NOW()
+                        """), {
+                            "id": _uuid.uuid4(), "user_id": u.id, "lesson_id": all_lessons[i].id,
+                            "status": "completed", "score": random.randint(70, 100),
+                            "attempts": random.randint(1, 3), "time_spent_sec": random.randint(120, 600),
+                            "completed_at": comp_at,
+                        })
 
-                    db.add(UserPathProgress(
-                        user_id=u.id, path_id=AUTO_PATH_ID,
-                        status=ProgressStatus.in_progress,
-                        started_at=datetime.now(timezone.utc) - timedelta(days=14),
-                        xp_earned=total_xp,
-                    ))
+                    await db.execute(text("""
+                        INSERT INTO user_path_progress
+                            (id, user_id, path_id, status, started_at, xp_earned)
+                        VALUES
+                            (:id, :user_id, :path_id, CAST(:status AS progress_status), :started_at, :xp_earned)
+                        ON CONFLICT (user_id, path_id) DO UPDATE SET
+                            xp_earned  = EXCLUDED.xp_earned,
+                            status     = EXCLUDED.status
+                    """), {
+                        "id": _uuid.uuid4(), "user_id": u.id, "path_id": AUTO_PATH_ID,
+                        "status": "in_progress",
+                        "started_at": datetime.now(timezone.utc) - timedelta(days=14),
+                        "xp_earned": total_xp,
+                    })
                     for day_off in range(min(this_week, (today - monday).days + 1)):
-                        db.add(DailyStreak(
-                            user_id=u.id, activity_date=monday + timedelta(days=day_off),
-                            xp_earned=random.randint(30, 50), lessons_done=random.randint(1, 3),
-                        ))
+                        await db.execute(text("""
+                            INSERT INTO daily_streaks
+                                (id, user_id, activity_date, xp_earned, lessons_done, created_at)
+                            VALUES
+                                (:id, :user_id, :activity_date, :xp_earned, :lessons_done, NOW())
+                            ON CONFLICT (user_id, activity_date) DO UPDATE SET
+                                xp_earned    = EXCLUDED.xp_earned,
+                                lessons_done = EXCLUDED.lessons_done
+                        """), {
+                            "id": _uuid.uuid4(), "user_id": u.id,
+                            "activity_date": monday + timedelta(days=day_off),
+                            "xp_earned": random.randint(30, 50), "lessons_done": random.randint(1, 3),
+                        })
                     u.total_xp = total_xp
                     u.level = max(1, total_xp // 500 + 1)
                     u.streak_current = u_data["streak"]
@@ -265,12 +290,7 @@ async def _auto_seed():
                         u.company_id = AUTO_APP_COMPANY["id"]
                         u.onboarding_done = True
 
-                    await db.flush()
-                    await db.execute(text("DELETE FROM user_lesson_progress WHERE user_id = :uid"), {"uid": u.id})
-                    await db.execute(text("DELETE FROM user_path_progress WHERE user_id = :uid"), {"uid": u.id})
-                    await db.execute(text("DELETE FROM daily_streaks WHERE user_id = :uid"), {"uid": u.id})
-                    await db.execute(text("DELETE FROM user_badges WHERE user_id = :uid"), {"uid": u.id})
-
+                    await db.flush()  # ensure user is persisted before referencing u.id in SQL
                     total = min(sp["lessons_total"], len(all_lessons2))
                     this_week = sp["lessons_this_week"]
                     older = total - this_week
@@ -284,32 +304,65 @@ async def _auto_seed():
                         else:
                             day_off = min(i - older, (today2 - monday2).days)
                             comp_at = datetime(monday2.year, monday2.month, monday2.day, random.randint(8, 20), random.randint(0, 59), tzinfo=timezone.utc) + timedelta(days=day_off)
-                        db.add(UserLessonProgress(
-                            user_id=u.id, lesson_id=all_lessons2[i].id,
-                            status=ProgressStatus.completed,
-                            score=random.randint(72, 100), attempts=random.randint(1, 3),
-                            time_spent_sec=random.randint(90, 540), completed_at=comp_at,
-                        ))
+                        await db.execute(text("""
+                            INSERT INTO user_lesson_progress
+                                (id, user_id, lesson_id, status, score, attempts, time_spent_sec, completed_at, created_at, updated_at)
+                            VALUES
+                                (:id, :user_id, :lesson_id, CAST(:status AS progress_status), :score, :attempts, :time_spent_sec, :completed_at, NOW(), NOW())
+                            ON CONFLICT (user_id, lesson_id) DO UPDATE SET
+                                status         = EXCLUDED.status,
+                                score          = EXCLUDED.score,
+                                attempts       = EXCLUDED.attempts,
+                                time_spent_sec = EXCLUDED.time_spent_sec,
+                                completed_at   = EXCLUDED.completed_at,
+                                updated_at     = NOW()
+                        """), {
+                            "id": _uuid2.uuid4(), "user_id": u.id, "lesson_id": all_lessons2[i].id,
+                            "status": "completed", "score": random.randint(72, 100),
+                            "attempts": random.randint(1, 3), "time_spent_sec": random.randint(90, 540),
+                            "completed_at": comp_at,
+                        })
 
-                    db.add(UserPathProgress(
-                        user_id=u.id, path_id=AUTO_PATH_ID2,
-                        status=ProgressStatus.in_progress,
-                        started_at=datetime.now(timezone.utc) - timedelta(days=21),
-                        xp_earned=total_xp,
-                    ))
+                    await db.execute(text("""
+                        INSERT INTO user_path_progress
+                            (id, user_id, path_id, status, started_at, xp_earned)
+                        VALUES
+                            (:id, :user_id, :path_id, CAST(:status AS progress_status), :started_at, :xp_earned)
+                        ON CONFLICT (user_id, path_id) DO UPDATE SET
+                            xp_earned  = EXCLUDED.xp_earned,
+                            status     = EXCLUDED.status
+                    """), {
+                        "id": _uuid2.uuid4(), "user_id": u.id, "path_id": AUTO_PATH_ID2,
+                        "status": "in_progress",
+                        "started_at": datetime.now(timezone.utc) - timedelta(days=21),
+                        "xp_earned": total_xp,
+                    })
                     for day_off in range(min(this_week, (today2 - monday2).days + 1)):
-                        db.add(DailyStreak(
-                            user_id=u.id, activity_date=monday2 + timedelta(days=day_off),
-                            xp_earned=random.randint(35, 55), lessons_done=random.randint(1, 3),
-                        ))
+                        await db.execute(text("""
+                            INSERT INTO daily_streaks
+                                (id, user_id, activity_date, xp_earned, lessons_done, created_at)
+                            VALUES
+                                (:id, :user_id, :activity_date, :xp_earned, :lessons_done, NOW())
+                            ON CONFLICT (user_id, activity_date) DO UPDATE SET
+                                xp_earned    = EXCLUDED.xp_earned,
+                                lessons_done = EXCLUDED.lessons_done
+                        """), {
+                            "id": _uuid2.uuid4(), "user_id": u.id,
+                            "activity_date": monday2 + timedelta(days=day_off),
+                            "xp_earned": random.randint(35, 55), "lessons_done": random.randint(1, 3),
+                        })
                     for badge_name in sp["badge_names"]:
                         badge = badge_map.get(badge_name)
                         if badge:
-                            db.add(UserBadge(
-                                user_id=u.id, badge_id=badge.id,
-                                earned_at=datetime.now(timezone.utc) - timedelta(days=random.randint(1, 14)),
-                                context={},
-                            ))
+                            await db.execute(text("""
+                                INSERT INTO user_badges (id, user_id, badge_id, earned_at, context)
+                                VALUES (:id, :user_id, :badge_id, :earned_at, CAST(:context AS jsonb))
+                                ON CONFLICT (user_id, badge_id) DO NOTHING
+                            """), {
+                                "id": _uuid2.uuid4(), "user_id": u.id, "badge_id": badge.id,
+                                "earned_at": datetime.now(timezone.utc) - timedelta(days=random.randint(1, 14)),
+                                "context": "{}",
+                            })
                     u.total_xp = total_xp
                     u.level = max(1, total_xp // 500 + 1)
                     u.streak_current = sp["streak"]
