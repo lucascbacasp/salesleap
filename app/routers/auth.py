@@ -26,10 +26,58 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
     user = result.scalar_one_or_none()
 
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Pedí tu acceso vía quickconsultora@gmail.com",
+        # Check if the email domain belongs to an active company → auto-register
+        auto_company = None
+        if "@" in body.email:
+            domain = body.email.split("@")[1].lower()
+            domain_result = await db.execute(
+                select(Company).where(
+                    Company.email_domain == domain,
+                    Company.is_active.is_(True),
+                ).limit(1)
+            )
+            auto_company = domain_result.scalar_one_or_none()
+
+        if auto_company is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Pedí tu acceso vía quickconsultora@gmail.com",
+            )
+
+        # Auto-register: create user linked to the matched company
+        display_name = (body.full_name or "").strip() or body.email.split("@")[0].capitalize()
+        user = User(
+            email=body.email.lower(),
+            full_name=display_name,
+            role=UserRole.learner,
+            company_id=auto_company.id,
+            industry=auto_company.industry,
+            experience_level="beginner",
+            email_verified=False,
+            onboarding_done=False,
         )
+        db.add(user)
+        await db.flush()
+
+        # Assign the company's published onboarding path (if any)
+        onb_path_result = await db.execute(
+            select(LearningPath).where(
+                LearningPath.company_id == auto_company.id,
+                LearningPath.is_published.is_(True),
+            ).limit(1)
+        )
+        onb_path = onb_path_result.scalar_one_or_none()
+        if onb_path:
+            db.add(UserPathProgress(
+                user_id=user.id,
+                path_id=onb_path.id,
+                status=ProgressStatus.in_progress,
+                started_at=datetime.now(timezone.utc),
+            ))
+            # Journey-type paths keep onboarding_done=False (user sees the journey screen first)
+            if not (onb_path.industry and onb_path.industry.startswith("onboarding_")):
+                user.onboarding_done = True
+        await db.flush()
 
     else:
         # Existing user — ensure admin emails always have admin role
