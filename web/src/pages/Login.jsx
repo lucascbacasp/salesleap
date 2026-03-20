@@ -28,7 +28,7 @@ function RequestLink() {
         login(data.access_token);
         const isAdmin = ['admin', 'manager', 'superadmin'].includes(data.role);
         navigate(
-          isAdmin ? '/admin' : data.onboarding_done ? '/dashboard' : '/onboarding',
+          isAdmin ? '/admin' : data.onboarding_done ? '/dashboard' : '/onboarding-journey',
           { replace: true }
         );
       }
@@ -103,7 +103,7 @@ function VerifyToken({ token }) {
         if (isAdmin) {
           navigate('/admin', { replace: true });
         } else if (!data.onboarding_done) {
-          navigate('/onboarding', { replace: true });
+          navigate('/onboarding-journey', { replace: true });
         } else {
           navigate('/dashboard', { replace: true });
         }

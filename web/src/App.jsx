@@ -7,6 +7,7 @@ import PathDetail from './pages/PathDetail';
 import LessonView from './pages/LessonView';
 import Coach from './pages/Coach';
 import Admin from './pages/Admin';
+import OnboardingJourney from './pages/OnboardingJourney';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -45,6 +46,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Onboarding />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/onboarding-journey"
+        element={
+          <ProtectedRoute>
+            <OnboardingJourney />
           </ProtectedRoute>
         }
       />

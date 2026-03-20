@@ -40,6 +40,7 @@ export const api = {
 
   // Modules
   getModule: (id) => request(`/modules/${id}`),
+  getPathModules: (pathId) => request(`/paths/${pathId}/modules`),
 
   // Gamification
   getLeaderboard: () => request('/gamification/leaderboard'),
