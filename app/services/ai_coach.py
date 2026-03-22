@@ -6,6 +6,7 @@ import json
 from typing import Optional
 import anthropic
 from app.core.config import settings
+from app.services.changan_knowledge import CHANGAN_KNOWLEDGE
 
 client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 MODEL = "claude-3-haiku-20240307"
@@ -61,11 +62,13 @@ INDUSTRY_COACH_CONFIG = {
             "gestión del proceso de entrega del vehículo",
             "métricas de ventas: tasa de cierre, ticket promedio, satisfacción",
             "contenido de los módulos de Venta Consultiva Automotriz",
+            "módulo Hablemos de Changan: modelo CS55 Plus PHEV, precios, financiación, objeciones y comparativa",
         ],
         "out_of_scope_reply": (
             "Esa pregunta está fuera de mi área. "
             "Puedo ayudarte con técnicas de venta automotriz, manejo de objeciones y todo lo de tu capacitación."
         ),
+        "brand_knowledge": CHANGAN_KNOWLEDGE,
     },
     "inmobiliaria": {
         "persona": "Coach de Ventas Inmobiliarias",
@@ -128,6 +131,9 @@ def _build_system_prompt(user_context: dict) -> str:
     current_path = user_context.get("current_path") or "—"
     last_lesson  = user_context.get("last_lesson") or "—"
 
+    brand_block = config.get("brand_knowledge", "")
+    brand_section = f"\n\nBASE DE CONOCIMIENTO DE MARCA\n{brand_block}" if brand_block else ""
+
     return f"""Sos {config['persona']} de SalesLeap.
 Hablás en español rioplatense, sos directo, claro y motivador.
 Tus respuestas son cortas (máximo 3 párrafos) y siempre accionables.
@@ -150,7 +156,7 @@ PERFIL DEL USUARIO
 - Nivel: {level}
 - Racha actual: {streak} días
 - Path actual: {current_path}
-- Última lección: {last_lesson}"""
+- Última lección: {last_lesson}{brand_section}"""
 
 
 # ── Funciones públicas ────────────────────────────────────────────────────────
