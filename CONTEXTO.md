@@ -33,7 +33,7 @@ El producto convierte el entrenamiento corporativo (ventas, inocuidad alimentari
 | Base de datos | PostgreSQL |
 | Auth | Magic Link JWT (sin contraseñas) |
 | AI Coach | Anthropic Claude API (`claude-3-haiku`) |
-| Deploy | Railway (Docker vía `Procfile`) |
+| Deploy | Railway (Dockerfile multi-stage: buildea el SPA y lo sirve el backend) |
 | Schema | `schema.sql` aplicado en cada startup |
 | Seed | `_auto_seed()` idempotente en lifespan de FastAPI |
 
