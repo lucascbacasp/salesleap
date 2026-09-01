@@ -6,7 +6,7 @@ Test del flujo completo de auth (demo mode):
   4. Auto-asociación de empresa por dominio de email
 """
 from httpx import AsyncClient
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import User
@@ -120,3 +120,110 @@ async def test_company_auto_association(client: AsyncClient, db: AsyncSession):
     user = result.scalar_one()
     assert user.company_id is not None
     assert user.industry == "auto"
+
+
+async def test_unknown_domain_is_rejected(client: AsyncClient, db: AsyncSession):
+    """Un email cuyo dominio no matchea ninguna Company activa → 403, sin crear usuario."""
+    resp = await client.post(
+        "/api/auth/request-link",
+        json={"email": "intruso@dominio-no-registrado.com"},
+    )
+    assert resp.status_code == 403
+
+    result = await db.execute(
+        select(User).where(User.email == "intruso@dominio-no-registrado.com")
+    )
+    assert result.scalar_one_or_none() is None
+
+
+async def test_inactive_company_domain_is_rejected(client: AsyncClient, db: AsyncSession):
+    """El dominio sólo habilita el alta si la empresa está activa."""
+    await db.execute(
+        text(
+            "INSERT INTO companies (name, slug, email_domain, industry, is_active) "
+            "VALUES ('Baja SA', 'baja-sa', 'baja.app', 'auto', false)"
+        )
+    )
+    await db.commit()
+
+    resp = await client.post(
+        "/api/auth/request-link", json={"email": "alguien@baja.app"}
+    )
+    assert resp.status_code == 403
+
+
+async def test_known_domain_auto_registers(client: AsyncClient, db: AsyncSession):
+    """Un email nuevo de un dominio registrado se crea y queda ligado a la empresa."""
+    await db.execute(
+        text(
+            "INSERT INTO companies (name, slug, email_domain, industry) "
+            "VALUES ('Servagrop', 'servagrop', 'agro.app', 'alimentaria')"
+        )
+    )
+    await db.commit()
+
+    resp = await client.post(
+        "/api/auth/request-link",
+        json={"email": "nuevo@agro.app", "full_name": "Nuevo Operario"},
+    )
+    assert resp.status_code == 200
+    assert "access_token" in resp.json()
+
+    result = await db.execute(select(User).where(User.email == "nuevo@agro.app"))
+    user = result.scalar_one()
+    assert user.company_id is not None
+    assert user.industry == "alimentaria"
+
+
+async def test_email_lookup_is_case_insensitive(client: AsyncClient, db: AsyncSession):
+    """"TEST@Example.com" es el mismo usuario que "test@example.com".
+
+    El SELECT era case-sensitive: no encontraba la fila del usuario y caía en
+    el alta automática, que para un dominio sin empresa termina en 403.
+    """
+    resp = await client.post(
+        "/api/auth/request-link", json={"email": "  TEST@Example.com  "}
+    )
+    assert resp.status_code == 200
+
+    result = await db.execute(
+        select(func.count()).select_from(User).where(User.email == "test@example.com")
+    )
+    assert result.scalar_one() == 1
+
+    # Ningún usuario quedó guardado con mayúsculas (no se creó un duplicado)
+    result = await db.execute(
+        select(func.count()).select_from(User).where(User.email != func.lower(User.email))
+    )
+    assert result.scalar_one() == 0
+
+
+async def test_mixed_case_email_on_registered_domain_does_not_duplicate(
+    client: AsyncClient, db: AsyncSession
+):
+    """Mismo bug, peor síntoma: con dominio registrado el alta automática
+    chocaba contra el UNIQUE de users.email y devolvía 500."""
+    await db.execute(
+        text(
+            "INSERT INTO companies (name, slug, email_domain, industry) "
+            "VALUES ('Servagrop', 'servagrop', 'agro.app', 'alimentaria')"
+        )
+    )
+    await db.commit()
+
+    first = await client.post(
+        "/api/auth/request-link",
+        json={"email": "javier@agro.app", "full_name": "Javier"},
+    )
+    assert first.status_code == 200
+
+    again = await client.post(
+        "/api/auth/request-link", json={"email": "Javier@Agro.app"}
+    )
+    assert again.status_code == 200
+    assert again.json()["user_id"] == first.json()["user_id"]
+
+    result = await db.execute(
+        select(func.count()).select_from(User).where(User.email == "javier@agro.app")
+    )
+    assert result.scalar_one() == 1

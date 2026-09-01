@@ -21,15 +21,20 @@ router = APIRouter()
 
 @router.post("/request-link", response_model=MagicLinkResponse)
 async def request_magic_link(body: MagicLinkRequest, db: DB):
+    # Users are stored lower-cased, so normalise before looking one up:
+    # otherwise "Javier@Agro.app" misses the existing row, falls into the
+    # auto-register branch and hits the UNIQUE constraint on users.email.
+    email = body.email.strip().lower()
+
     # Buscar o crear usuario
-    result = await db.execute(select(User).where(User.email == body.email))
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
     if user is None:
         # Check if the email domain belongs to an active company → auto-register
         auto_company = None
-        if "@" in body.email:
-            domain = body.email.split("@")[1].lower()
+        if "@" in email:
+            domain = email.split("@")[1]
             domain_result = await db.execute(
                 select(Company).where(
                     Company.email_domain == domain,
@@ -45,9 +50,9 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
             )
 
         # Auto-register: create user linked to the matched company
-        display_name = (body.full_name or "").strip() or body.email.split("@")[0].capitalize()
+        display_name = (body.full_name or "").strip() or email.split("@")[0].capitalize()
         user = User(
-            email=body.email.lower(),
+            email=email,
             full_name=display_name,
             role=UserRole.learner,
             company_id=auto_company.id,
@@ -81,7 +86,7 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
 
     else:
         # Existing user — ensure admin emails always have admin role
-        if body.email.lower() in ADMIN_EMAILS and user.role == UserRole.learner:
+        if email in ADMIN_EMAILS and user.role == UserRole.learner:
             user.role = UserRole.admin
             user.onboarding_done = True
             if not user.company_id:
@@ -94,8 +99,8 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
                     user.industry = first_company.industry
 
         # Auto-associate company by email domain if not yet linked
-        if user.company_id is None and "@" in body.email:
-            domain = body.email.split("@")[1].lower()
+        if user.company_id is None and "@" in email:
+            domain = email.split("@")[1]
             domain_result = await db.execute(
                 select(Company).where(
                     Company.email_domain == domain,
@@ -108,7 +113,7 @@ async def request_magic_link(body: MagicLinkRequest, db: DB):
                 user.industry = matched_company.industry
 
         # Existing non-admin user with onboarding not done → recover from pre-seeded state
-        if not user.onboarding_done and body.email.lower() not in ADMIN_EMAILS:
+        if not user.onboarding_done and email not in ADMIN_EMAILS:
             path_check_result = await db.execute(
                 select(UserPathProgress, LearningPath)
                 .join(LearningPath, UserPathProgress.path_id == LearningPath.id)
