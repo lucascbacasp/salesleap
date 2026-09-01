@@ -191,6 +191,17 @@ Configurar en Vercel:
 - Verificá que Railway está usando el Dockerfile (no Nixpacks)
 - En **Settings** → **Builder** → seleccionar **Dockerfile**
 
+### GET /login (o cualquier ruta del SPA) devuelve 404
+
+El backend sirve el frontend desde `static/`. Si esa carpeta no está en la
+imagen, el catch-all no se registra y toda ruta que no sea de la API da 404.
+
+- `curl https://TU-APP/health` → si responde `"spa": false`, la imagen no
+  tiene el frontend buildeado.
+- **Settings** → **Builder** → seleccionar **Dockerfile**: la stage
+  `fe-builder` corre `npm run build` y copia `web/dist` a `static/`.
+- El log de arranque también lo avisa: `SPA catch-all NOT registered`.
+
 ### Los magic links no llegan
 - En desarrollo, los tokens se loguean a consola. Revisá los logs de Railway.
 - Para enviar emails reales, configurá las variables SMTP.

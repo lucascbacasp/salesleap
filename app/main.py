@@ -536,6 +536,33 @@ async def lifespan(app: FastAPI):
 
 _is_prod = os.getenv("ENVIRONMENT", "").lower() == "production"
 
+# Built SPA — the Dockerfile copies web/dist here (COPY --from=fe-builder /web/dist ./static/)
+STATIC_DIR = Path(__file__).parent.parent / "static"
+
+# Prefixes the SPA catch-all must never swallow: they belong to the API and to
+# the docs, so an unknown path under them has to 404 instead of returning
+# index.html with a 200.
+RESERVED_PREFIXES = frozenset({"api", "health", "docs", "redoc", "openapi.json"})
+
+
+def resolve_spa_file(root: Path, full_path: str) -> Path | None:
+    """Resolve a SPA request path to an existing file inside `root`.
+
+    Returns None when the path points outside `root` — `Path.__truediv__`
+    does not collapse "..", so without this an encoded traversal such as
+    "%2e%2e/%2e%2e/proc/self/environ" would be served — or when it does not
+    name a real file. Callers fall back to index.html in both cases.
+    """
+    root = root.resolve()
+    try:
+        candidate = (root / full_path).resolve()
+    except (OSError, ValueError):
+        return None
+    if not candidate.is_relative_to(root):
+        return None
+    return candidate if candidate.is_file() else None
+
+
 app = FastAPI(
     title="SalesLeap API",
     version="1.0.0",
@@ -569,7 +596,7 @@ app.include_router(ai_coach.router,      prefix="/api/coach",         tags=["ai-
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "salesleap-api"}
+    return {"status": "ok", "service": "salesleap-api", "spa": SPA_MOUNTED}
 
 
 @app.post("/api/admin/init-db")
@@ -1254,17 +1281,45 @@ async def admin_seed_auto(x_admin_key: str = Header(...)):
 
 
 # ── Serve React SPA (must be AFTER all API routes) ──────────
-STATIC_DIR = Path(__file__).parent.parent / "static"
+def mount_spa(app: FastAPI, static_dir: Path) -> bool:
+    """Wire the built React SPA onto `app`.
 
-if STATIC_DIR.exists():
+    Must be called after every API router is registered: the catch-all matches
+    any path, and Starlette resolves routes in registration order.
+
+    Returns False when there is no build to serve.
+    """
+    if not static_dir.exists():
+        logger.error(
+            "startup: %s does not exist — SPA catch-all NOT registered, every "
+            "non-API GET (/login, /dashboard, ...) will return 404. Check that "
+            "the deploy builds the frontend (Dockerfile stage fe-builder).",
+            static_dir,
+        )
+        return False
+
+    static_root = static_dir.resolve()
+    index_html = static_root / "index.html"
+
     # Serve static assets (JS, CSS, images)
-    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+    assets_dir = static_root / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
     # Serve other static files at root (favicon, etc.)
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         """Serve the SPA — any non-API route returns index.html."""
-        file_path = STATIC_DIR / full_path
-        if file_path.is_file():
+        if full_path.split("/", 1)[0] in RESERVED_PREFIXES:
+            raise HTTPException(status_code=404, detail="Not Found")
+
+        file_path = resolve_spa_file(static_root, full_path)
+        if file_path is not None:
             return FileResponse(file_path)
-        return FileResponse(STATIC_DIR / "index.html")
+        return FileResponse(index_html)
+
+    return True
+
+
+# Read by /health so a deploy without a frontend build is visible from outside.
+SPA_MOUNTED = mount_spa(app, STATIC_DIR)
