@@ -5,8 +5,10 @@ import asyncio
 import logging
 import ssl
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
@@ -19,14 +21,22 @@ logger = logging.getLogger(__name__)
 _LIBPQ_ONLY_PARAMS = ("channel_binding", "target_session_attrs", "options")
 
 
-def build_engine_args(url: str) -> tuple[str, dict]:
-    """Split a Postgres URL into (url asyncpg accepts, connect_args).
+# Transaction-mode poolers (Supabase/Supavisor and PgBouncer both default to
+# 6543) multiplex several clients onto one server connection.
+TRANSACTION_POOLER_PORT = 6543
+
+
+def build_engine_kwargs(url: str) -> tuple[str, dict]:
+    """Split a Postgres URL into (url asyncpg accepts, create_async_engine kwargs).
 
     Honours libpq's "?sslmode=" the way libpq defines it: "require" encrypts
     without validating the certificate, "verify-ca"/"verify-full" also
     validate it. "prefer"/"allow"/"disable" are dropped without forcing TLS —
     asyncpg already negotiates it when the server offers it. settings.DB_SSL
     forces the "require" behaviour when the URL says nothing.
+
+    Also picks the pooling strategy: a transaction-mode pooler needs prepared
+    statements disabled and NullPool, which is incompatible with pool_size.
     """
     parsed = urlsplit(url)
     params = dict(parse_qsl(parsed.query))
@@ -43,23 +53,37 @@ def build_engine_args(url: str) -> tuple[str, dict]:
         context.verify_mode = ssl.CERT_NONE
         connect_args["ssl"] = context
 
+    kwargs: dict = {"connect_args": connect_args}
+
+    if parsed.port == TRANSACTION_POOLER_PORT or settings.DB_TRANSACTION_POOLER:
+        # The asyncpg dialect calls Connection.prepare() for *every* statement,
+        # and asyncpg names them in numeric order. Behind a transaction pooler
+        # those names collide across clients sharing a server connection:
+        #     asyncpg.exceptions.DuplicatePreparedStatementError
+        # Unique names plus no caching is the combination SQLAlchemy documents
+        # for PgBouncer; it applies verbatim to Supabase's Supavisor.
+        connect_args["statement_cache_size"] = 0
+        connect_args["prepared_statement_cache_size"] = 0
+        connect_args["prepared_statement_name_func"] = lambda: f"__asyncpg_{uuid4()}__"
+        # SQLAlchemy warns that without NullPool the prepared statements pile
+        # up on the pooler side. NullPool takes no pool_size/max_overflow.
+        kwargs["poolclass"] = NullPool
+    else:
+        kwargs["pool_size"] = settings.DB_POOL_SIZE
+        kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
+        # A pooled/managed Postgres drops idle connections behind our back;
+        # without these the first query after an idle period fails instead of
+        # reconnecting.
+        kwargs["pool_pre_ping"] = True
+        kwargs["pool_recycle"] = 1800
+
     clean_url = urlunsplit(parsed._replace(query=urlencode(params)))
-    return clean_url, connect_args
+    return clean_url, kwargs
 
 
-_url, _connect_args = build_engine_args(settings.DATABASE_URL)
+_url, _engine_kwargs = build_engine_kwargs(settings.DATABASE_URL)
 
-engine = create_async_engine(
-    _url,
-    echo=settings.DEBUG,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    # A pooled/managed Postgres drops idle connections behind our back; without
-    # these, the first query after an idle period fails instead of reconnecting.
-    pool_pre_ping=True,
-    pool_recycle=1800,
-    connect_args=_connect_args,
-)
+engine = create_async_engine(_url, echo=settings.DEBUG, **_engine_kwargs)
 
 async_session = async_sessionmaker(
     engine,

@@ -187,52 +187,182 @@ Alternativa sin costo para demos. Cloud Run corre el `Dockerfile` tal cual y
 escala a cero; su free tier (2M requests/mes) no expira. Supabase aporta el
 Postgres.
 
-### 1. Base de datos (Supabase)
+---
 
-1. Crear un proyecto en [supabase.com](https://supabase.com) (plan Free).
-2. **Settings → Database → Connection string → Transaction pooler.** Copiar
-   esa URL, no la directa.
-3. Adaptarla al driver async — Supabase la entrega en formato `libpq`:
+### Paso 1 — Crear el proyecto en Supabase
 
-   ```
-   postgresql://...        →  postgresql+asyncpg://...
-   ```
+1. [supabase.com](https://supabase.com) → **New project**, plan **Free**.
+2. **Region:** elegir la misma que vaya a usar Cloud Run (ej. `us-east-1` con
+   `us-east1`). Cada consulta cruza esa distancia; con regiones distintas se
+   pagan 100ms+ por request.
+3. **Database password:** generarla y guardarla — se muestra una sola vez y va
+   dentro de `DATABASE_URL`.
 
-   El `?sslmode=require` puede quedarse: `app/core/database.py` lo traduce a
-   la config TLS que asyncpg entiende (asyncpg lo rechazaría como parámetro).
+El proyecto tarda un par de minutos en aprovisionarse.
 
-### 2. Aplicación (Cloud Run)
+---
+
+### Paso 2 — Sacar la connection string correcta
+
+**Connect** (arriba en el dashboard) ofrece tres opciones. La elección importa:
+
+| Opción | Puerto | Sirve acá |
+|---|---|---|
+| **Session pooler** | 5432 | ✅ **Usar esta** |
+| Transaction pooler | 6543 | Funciona, pero desactiva prepared statements |
+| Direct connection | 5432 | ❌ Es IPv6-only; Cloud Run sale por IPv4 |
+
+Copiar la de **Session pooler**. Tiene esta forma:
+
+```
+postgresql://postgres.abcdefghijklm:TU_PASSWORD@aws-0-us-east-1.pooler.supabase.com:5432/postgres
+             └──────┬──────────────┘
+                el usuario incluye el project-ref: no es sólo "postgres"
+```
+
+**Por qué el session pooler y no el de transacción:** el dialecto asyncpg de
+SQLAlchemy usa `prepare()` para toda sentencia. Un pooler en modo transacción
+multiplexa varios clientes sobre la misma conexión del servidor, y los nombres
+que asyncpg asigna en orden numérico chocan entre sí:
+
+```
+asyncpg.exceptions.DuplicatePreparedStatementError
+```
+
+El session pooler da una conexión dedicada por cliente y no tiene ese
+problema. Con `--max-instances 2` y `DB_POOL_SIZE=5` son 10 conexiones como
+mucho — muy por debajo del límite del tier gratuito.
+
+Si aun así hace falta el de transacción (muchas instancias en paralelo),
+`app/core/database.py` lo detecta por el puerto 6543 y aplica solo la
+configuración que necesita: nombres únicos de prepared statement, cachés en
+cero y `NullPool`. Con un pooler en otro puerto, forzarlo con
+`DB_TRANSACTION_POOLER=true`.
+
+---
+
+### Paso 3 — Adaptar la URL al driver async
+
+Dos cambios sobre lo que copiaste:
+
+```diff
+- postgresql://postgres.abcdefghijklm:PASS@aws-0-us-east-1.pooler.supabase.com:5432/postgres
++ postgresql+asyncpg://postgres.abcdefghijklm:PASS@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+1. `postgresql://` → **`postgresql+asyncpg://`** (sin esto SQLAlchemy busca el
+   driver sincrónico y no arranca).
+2. El `?sslmode=require` es opcional pero recomendado: `build_engine_kwargs()`
+   lo traduce a la config TLS que asyncpg entiende. **No hace falta sacarlo**
+   si venía en la URL — asyncpg lo rechazaría como parámetro y la app no
+   levantaría, y justamente por eso el código lo intercepta.
+
+Si la password tiene caracteres especiales (`@`, `/`, `:`, `#`), hay que
+URL-encodearlos: `@` → `%40`, `/` → `%2F`, `#` → `%23`.
+
+---
+
+### Paso 4 — Crear el schema
+
+No hay que hacer nada: en el primer arranque `AUTO_SEED=auto` detecta la base
+vacía, aplica `schema.sql` y siembra las 4 empresas demo con sus usuarios y
+progreso. Los arranques siguientes la detectan poblada y saltean.
+
+Para hacerlo a mano y ver los errores en el momento: **SQL Editor** →
+pegar `schema.sql` → **Run**.
+
+Verificar en **Table Editor**: tienen que aparecer 16 tablas y `companies` con
+6 filas después del primer arranque de la app.
+
+---
+
+### Paso 5 — Deploy en Cloud Run
+
+Las variables van en un archivo YAML, no inline: `DATABASE_URL` puede contener
+comas y otros caracteres que `gcloud` interpreta como separadores, y así
+además no quedan secretos en el historial del shell.
+
+Crear `.env.yaml` en la raíz (ya está en `.gitignore`):
+
+```yaml
+ENVIRONMENT: production
+AUTO_SEED: auto
+WEB_CONCURRENCY: "1"
+DB_POOL_SIZE: "5"
+DATABASE_URL: postgresql+asyncpg://postgres.REF:PASS@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+SECRET_KEY: generar-con-openssl-rand-hex-32
+ANTHROPIC_API_KEY: sk-ant-...
+```
+
+Los valores numéricos van entre comillas: el YAML los convertiría a int y
+`gcloud` espera strings.
 
 ```bash
 gcloud run deploy salesleap \
   --source . \
-  --region us-central1 \
+  --region us-east1 \
   --allow-unauthenticated \
   --max-instances 2 \
-  --set-env-vars "ENVIRONMENT=production,AUTO_SEED=auto,WEB_CONCURRENCY=1" \
-  --set-env-vars "DATABASE_URL=postgresql+asyncpg://...,SECRET_KEY=...,ANTHROPIC_API_KEY=..."
+  --env-vars-file .env.yaml
 ```
 
 `--max-instances 2` acota las conexiones a la base: cada instancia abre su
-propio pool (`DB_POOL_SIZE`, 5 por defecto).
+propio pool de `DB_POOL_SIZE`.
 
-### 3. Verificar
+El primer deploy tarda varios minutos — construye la imagen entera, incluido
+el `npm run build` del frontend.
+
+### Paso 6 — Verificar
 
 ```bash
 curl https://TU-SERVICIO-xxxx.run.app/health
 ```
 
-`{"spa": true}` significa que el frontend quedó dentro de la imagen. El primer
-arranque siembra la base; los siguientes la detectan poblada y saltean el seed
-(95 consultas menos por arranque en frío).
+```json
+{"status":"ok","service":"salesleap-api","spa":true}
+```
 
-Después: agregar la URL del servicio a `CORS_ORIGINS` y redeployar.
+- **`"spa": true`** → el frontend quedó dentro de la imagen; `/login` anda.
+- **`"spa": false`** → el build de la imagen no incluyó `web/dist`.
+
+Después, en los logs de Cloud Run tiene que aparecer una sola vez:
+
+```
+startup: schema.sql applied
+startup: base content seeded
+startup: seed-agro (agro.app) applied
+```
+
+Y en los arranques siguientes:
+
+```
+startup: database already has 6 companies — skipping seed
+```
+
+Último paso: agregar la URL del servicio a `CORS_ORIGINS` y redeployar.
+
+Login de prueba: cualquier email `@agro.app`, `@auto.app` o `@admin.app`
+(ver `DEMO_PROFILES.md`).
+
+---
+
+### Problemas frecuentes
+
+| Síntoma | Causa |
+|---|---|
+| `InvalidPasswordError` | La password tiene caracteres especiales sin URL-encodear, o se usó el usuario `postgres` en vez de `postgres.PROJECT_REF` que pide el pooler |
+| `TypeError: connect() got an unexpected keyword argument 'sslmode'` | La app corre con una versión anterior a este cambio — actualizar |
+| `DuplicatePreparedStatementError` | Se está usando el pooler de transacción en un puerto distinto de 6543: setear `DB_TRANSACTION_POOLER=true` |
+| `ConnectionDoesNotExistError` / timeouts | Se usó la Direct connection (IPv6). Cambiar al session pooler |
+| `Network is unreachable` | Lo mismo: IPv6 |
+| El seed no corrió y las tablas están vacías | `AUTO_SEED=never`, o el schema se aplicó a mano y `companies` quedó con filas |
 
 ### Notas del tier gratuito
 
 - **Supabase Free se pausa** tras 7 días sin actividad. Los datos quedan, pero
   el proyecto se apaga hasta reactivarlo desde el dashboard. Con Cloud Run
-  escalando a cero no hay nada que la mantenga despierta.
+  escalando a cero no hay nada que la mantenga despierta: para una demo que
+  tiene que estar viva, conviene un ping periódico.
 - **Cloud Run exige tarjeta** en la cuenta de GCP, aunque no cobre dentro del
   free tier.
 - Alternativa sin tarjeta: **Render free**, pero duerme a los 15 minutos y
