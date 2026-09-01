@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # managed providers require it. A "?sslmode=" in DATABASE_URL also turns
     # it on — see app/core/database.py.
     DB_SSL: bool = False
+    # Force the transaction-pooler settings when the pooler does not run on
+    # the usual 6543 (auto-detected otherwise).
+    DB_TRANSACTION_POOLER: bool = False
 
     # Seeding on startup: "auto" (default) seeds only when the database is
     # still empty, "always" re-runs it on every boot (local dev), "never"
