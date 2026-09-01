@@ -181,6 +181,65 @@ Configurar en Vercel:
 
 ---
 
+## Deploy gratis: Google Cloud Run + Supabase
+
+Alternativa sin costo para demos. Cloud Run corre el `Dockerfile` tal cual y
+escala a cero; su free tier (2M requests/mes) no expira. Supabase aporta el
+Postgres.
+
+### 1. Base de datos (Supabase)
+
+1. Crear un proyecto en [supabase.com](https://supabase.com) (plan Free).
+2. **Settings → Database → Connection string → Transaction pooler.** Copiar
+   esa URL, no la directa.
+3. Adaptarla al driver async — Supabase la entrega en formato `libpq`:
+
+   ```
+   postgresql://...        →  postgresql+asyncpg://...
+   ```
+
+   El `?sslmode=require` puede quedarse: `app/core/database.py` lo traduce a
+   la config TLS que asyncpg entiende (asyncpg lo rechazaría como parámetro).
+
+### 2. Aplicación (Cloud Run)
+
+```bash
+gcloud run deploy salesleap \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --max-instances 2 \
+  --set-env-vars "ENVIRONMENT=production,AUTO_SEED=auto,WEB_CONCURRENCY=1" \
+  --set-env-vars "DATABASE_URL=postgresql+asyncpg://...,SECRET_KEY=...,ANTHROPIC_API_KEY=..."
+```
+
+`--max-instances 2` acota las conexiones a la base: cada instancia abre su
+propio pool (`DB_POOL_SIZE`, 5 por defecto).
+
+### 3. Verificar
+
+```bash
+curl https://TU-SERVICIO-xxxx.run.app/health
+```
+
+`{"spa": true}` significa que el frontend quedó dentro de la imagen. El primer
+arranque siembra la base; los siguientes la detectan poblada y saltean el seed
+(95 consultas menos por arranque en frío).
+
+Después: agregar la URL del servicio a `CORS_ORIGINS` y redeployar.
+
+### Notas del tier gratuito
+
+- **Supabase Free se pausa** tras 7 días sin actividad. Los datos quedan, pero
+  el proyecto se apaga hasta reactivarlo desde el dashboard. Con Cloud Run
+  escalando a cero no hay nada que la mantenga despierta.
+- **Cloud Run exige tarjeta** en la cuenta de GCP, aunque no cobre dentro del
+  free tier.
+- Alternativa sin tarjeta: **Render free**, pero duerme a los 15 minutos y
+  tarda ~1 minuto en despertar — hay que precalentarlo antes de una demo.
+
+---
+
 ## Troubleshooting
 
 ### Error: "connection refused" a PostgreSQL

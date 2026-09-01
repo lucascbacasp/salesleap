@@ -43,6 +43,9 @@ RUN chown -R app:app /app
 USER app
 
 ENV PORT=8000
+# One worker by default: each one opens its own DB pool, and managed Postgres
+# free tiers cap connections. Raise WEB_CONCURRENCY when traffic justifies it.
+ENV WEB_CONCURRENCY=1
 EXPOSE ${PORT}
 
-CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2
+CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers ${WEB_CONCURRENCY}

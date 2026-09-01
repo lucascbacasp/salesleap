@@ -527,10 +527,39 @@ async def _auto_seed():
         logger.error(f"startup: seed-agro error — {e}")
 
 
+async def _should_seed() -> bool:
+    """Decide whether _auto_seed() runs on this boot.
+
+    On a scale-to-zero host the lifespan runs on every cold start, so seeding
+    unconditionally would replay the whole seed against the database each time
+    the app wakes up. "auto" seeds a database that has no content yet and then
+    stays out of the way.
+    """
+    mode = settings.AUTO_SEED.strip().lower()
+    if mode in ("always", "true", "1", "yes"):
+        return True
+    if mode in ("never", "false", "0", "no"):
+        logger.info("startup: AUTO_SEED=%s — skipping seed", mode)
+        return False
+
+    try:
+        async with async_session() as db:
+            companies = (await db.execute(text("SELECT COUNT(*) FROM companies"))).scalar()
+    except Exception:
+        # Table missing (or unreachable) — treat as a fresh database.
+        return True
+
+    if companies:
+        logger.info("startup: database already has %s companies — skipping seed", companies)
+        return False
+    return True
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    await _auto_seed()
+    if await _should_seed():
+        await _auto_seed()
     yield
 
 
