@@ -11,6 +11,20 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://user:pass@localhost:5432/salesleap"
+    # Keep the pool small: managed Postgres (Supabase free, Neon, ...) caps
+    # connections, and every uvicorn worker opens its own pool.
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
+    # Force TLS to the database. Not needed for a local/docker Postgres; most
+    # managed providers require it. A "?sslmode=" in DATABASE_URL also turns
+    # it on — see app/core/database.py.
+    DB_SSL: bool = False
+
+    # Seeding on startup: "auto" (default) seeds only when the database is
+    # still empty, "always" re-runs it on every boot (local dev), "never"
+    # skips it. On a scale-to-zero host, "always" would re-run the whole
+    # seed on every cold start.
+    AUTO_SEED: str = "auto"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
